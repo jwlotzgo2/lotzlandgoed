@@ -56,12 +56,32 @@ Respond ONLY with a JSON object in this exact format, no other text:
   "reasoning": "<one clear sentence explaining your decision>"
 }`;
 
+    const isPdf = imageUrl.toLowerCase().includes(".pdf") || imageUrl.toLowerCase().includes("/pdf");
+
+    // For PDFs, fetch and convert to base64 for Claude's document API
+    let contentBlock: any;
+    if (isPdf) {
+      const pdfResponse = await fetch(imageUrl);
+      const pdfBuffer = await pdfResponse.arrayBuffer();
+      const base64 = Buffer.from(pdfBuffer).toString("base64");
+      contentBlock = {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: base64 },
+      };
+    } else {
+      contentBlock = {
+        type: "image",
+        source: { type: "url", url: imageUrl },
+      };
+    }
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": process.env.ANTHROPIC_API_KEY!,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "pdfs-2024-09-25",
       },
       body: JSON.stringify({
         model: "claude-opus-4-6",
@@ -70,10 +90,7 @@ Respond ONLY with a JSON object in this exact format, no other text:
           {
             role: "user",
             content: [
-              {
-                type: "image",
-                source: { type: "url", url: imageUrl },
-              },
+              contentBlock,
               {
                 type: "text",
                 text: prompt,
