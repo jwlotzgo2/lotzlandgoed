@@ -72,17 +72,33 @@ Respond ONLY with a JSON object in this exact format, no other text:
     let contentBlock: any;
     if (looksLikePdf) {
       try {
-        // Cloudinary stores PDFs under /raw/upload/ not /image/upload/
-        const fetchUrl = imageUrl.replace("/image/upload/", "/raw/upload/");
-        
-        console.log("Fetching PDF from:", fetchUrl.slice(0, 100));
-        
-        const pdfResponse = await fetch(fetchUrl);
-        if (!pdfResponse.ok) {
-          throw new Error(`Fetch failed: ${pdfResponse.status}`);
+        // Cloudinary PDFs: try raw/upload with and without .pdf extension
+        const baseUrl = imageUrl.replace("/image/upload/", "/raw/upload/");
+        const urlsToTry = [
+          baseUrl,
+          baseUrl + ".pdf",
+          imageUrl,
+          imageUrl + ".pdf",
+        ];
+
+        let pdfBuffer: ArrayBuffer | null = null;
+        let lastError = "";
+
+        for (const url of urlsToTry) {
+          console.log("Trying PDF URL:", url.slice(0, 120));
+          const res = await fetch(url);
+          if (res.ok) {
+            pdfBuffer = await res.arrayBuffer();
+            console.log("PDF fetched successfully from:", url.slice(0, 120));
+            break;
+          }
+          lastError = `${res.status} for ${url.slice(0, 80)}`;
         }
 
-        const pdfBuffer = await pdfResponse.arrayBuffer();
+        if (!pdfBuffer) {
+          throw new Error(`All URL attempts failed. Last: ${lastError}`);
+        }
+
         const base64 = Buffer.from(pdfBuffer).toString("base64");
         contentBlock = {
           type: "document",
