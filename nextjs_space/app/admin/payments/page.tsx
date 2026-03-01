@@ -337,7 +337,7 @@ export default function PaymentsPage() {
               </div>
 
               {/* AI Verification Panel */}
-              {selectedPayment.aiVerified && (
+              {(selectedPayment.aiVerified !== undefined && selectedPayment.aiVerified !== null || selectedPayment.aiReasoning) && (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <div className={`px-4 py-3 flex items-center justify-between ${
                     selectedPayment.aiAutoApproved ? "bg-green-50" :
