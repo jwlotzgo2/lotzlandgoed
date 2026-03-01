@@ -89,6 +89,7 @@ export async function POST(request: Request) {
 
     // Use aiScanUrl for AI (PDF converted to image), fall back to proofUrl
     const imageUrl = aiScanUrl || proofUrl || null;
+    console.log("payments POST: fileBase64 length =", fileBase64?.length ?? 0, "fileMimeType =", fileMimeType, "imageUrl =", imageUrl?.slice(0, 80));
 
     // Run AI verification if we have an image
     if (imageUrl) {
