@@ -72,19 +72,16 @@ Respond ONLY with a JSON object in this exact format, no other text:
     let contentBlock: any;
     if (looksLikePdf) {
       try {
-        // Try fetching the PDF - add format hint for Cloudinary
-        const fetchUrl = imageUrl.includes("cloudinary.com") && !imageUrl.includes(".pdf")
-          ? imageUrl + ".pdf"
-          : imageUrl;
+        // Cloudinary stores PDFs under /raw/upload/ not /image/upload/
+        const fetchUrl = imageUrl.replace("/image/upload/", "/raw/upload/");
         
-        const pdfResponse = await fetch(fetchUrl, {
-          headers: { "Accept": "application/pdf,*/*" },
-        });
+        console.log("Fetching PDF from:", fetchUrl.slice(0, 100));
         
+        const pdfResponse = await fetch(fetchUrl);
         if (!pdfResponse.ok) {
           throw new Error(`Fetch failed: ${pdfResponse.status}`);
         }
-        
+
         const pdfBuffer = await pdfResponse.arrayBuffer();
         const base64 = Buffer.from(pdfBuffer).toString("base64");
         contentBlock = {
@@ -93,7 +90,7 @@ Respond ONLY with a JSON object in this exact format, no other text:
         };
       } catch (e) {
         console.error("PDF fetch error:", e);
-        return failResult(`Could not fetch PDF: ${String(e).slice(0, 100)}`);
+        return failResult(`Could not fetch PDF: ${String(e).slice(0, 150)}`);
       }
     } else {
       contentBlock = {
