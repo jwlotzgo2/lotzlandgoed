@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Zap, Minus, Plus, Upload, Loader2, Check, AlertCircle } from "lucide-react";
 import { motion } from "framer-motion";
@@ -25,6 +25,8 @@ export default function BuyTokensPage() {
   const [aiScanUrl, setAiScanUrl] = useState("");
   const [fileBase64, setFileBase64] = useState("");
   const [fileMimeType, setFileMimeType] = useState("");
+  const fileBase64Ref = useRef("");
+  const fileMimeTypeRef = useRef("");
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(1);
 
@@ -36,6 +38,8 @@ export default function BuyTokensPage() {
     setProofIsPdf(isPdf);
     setFileBase64(b64 || "");
     setFileMimeType(mimeType || "");
+    fileBase64Ref.current = b64 || "";
+    fileMimeTypeRef.current = mimeType || "";
     setAiScanUrl("");
   };
 
@@ -63,8 +67,8 @@ export default function BuyTokensPage() {
           referenceNumber,
           paymentDate: paymentDate || null,
           proofIsPdf,
-          fileBase64,
-          fileMimeType,
+          fileBase64: fileBase64Ref.current,
+          fileMimeType: fileMimeTypeRef.current,
         }),
       });
 
