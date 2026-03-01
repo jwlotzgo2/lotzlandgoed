@@ -39,6 +39,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       fileUrl: result.secure_url,
       cloudStoragePath: result.public_id,
+      url: result.secure_url,
     });
   } catch (error) {
     console.error("Cloudinary upload error:", error);

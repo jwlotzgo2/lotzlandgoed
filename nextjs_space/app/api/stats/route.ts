@@ -51,13 +51,11 @@ export async function GET(request: Request) {
       select: {
         id: true,
         meterNumber: true,
-        user: { select: { name: true } },
-        _count: {
-          select: { tokens: true },
-        },
+        address: true,
+        user: { select: { name: true, phone: true } },
+        _count: { select: { tokens: true } },
         tokens: {
-          where: { status: "AVAILABLE" },
-          select: { id: true },
+          select: { id: true, status: true },
         },
       },
     });
@@ -65,9 +63,12 @@ export async function GET(request: Request) {
     const meterStats = tokensByMeter.map((m) => ({
       meterId: m.id,
       meterNumber: m.meterNumber,
+      address: m.address,
       userName: m.user?.name ?? "Unassigned",
+      userPhone: m.user?.phone ?? "",
       totalTokens: m._count.tokens,
-      availableTokens: m.tokens.length,
+      availableTokens: m.tokens.filter((t) => t.status === "AVAILABLE").length,
+      usedTokens: m.tokens.filter((t) => t.status === "USED").length,
     }));
 
     // Monthly revenue trend (last 6 months)
