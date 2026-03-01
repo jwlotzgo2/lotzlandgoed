@@ -1,10 +1,12 @@
-import { notifyAdmins } from "@/lib/notifications";
+export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
 import { TOKEN_PRICE } from "@/lib/types";
+import { notifyAdmins, createNotification } from "@/lib/notifications";
+import { verifyProofOfPayment } from "@/lib/verify-payment";
 
 export async function GET(request: Request) {
   try {
@@ -19,14 +21,8 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
 
     const where: any = {};
-
-    if (userRole !== "ADMIN") {
-      where.userId = userId;
-    }
-
-    if (status) {
-      where.status = status;
-    }
+    if (userRole !== "ADMIN") where.userId = userId;
+    if (status) where.status = status;
 
     const payments = await prisma.payment.findMany({
       where,
@@ -53,41 +49,27 @@ export async function POST(request: Request) {
     }
 
     const userId = (session.user as any)?.id;
-    const {
-      meterId,
-      quantity,
-      proofUrl,
-      cloudStoragePath,
-      isPublic,
-      referenceNumber,
-      paymentDate,
-    } = await request.json();
+    const { meterId, quantity, proofUrl, cloudStoragePath, referenceNumber, paymentDate } =
+      await request.json();
 
     if (!meterId || !quantity || quantity < 1) {
-      return NextResponse.json(
-        { error: "Meter and quantity are required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Meter and quantity are required" }, { status: 400 });
     }
 
-    // Verify user owns this meter
-    const meter = await prisma.meter.findFirst({
-      where: { id: meterId, userId },
-    });
-
+    const meter = await prisma.meter.findFirst({ where: { id: meterId, userId } });
     if (!meter) {
-      return NextResponse.json(
-        { error: "Meter not found or not assigned to you" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Meter not found or not assigned to you" }, { status: 400 });
     }
 
+    const expectedAmount = quantity * TOKEN_PRICE;
+
+    // Create payment as PENDING initially
     const payment = await prisma.payment.create({
       data: {
         userId,
         meterId,
         quantity,
-        totalAmount: quantity * TOKEN_PRICE,
+        totalAmount: expectedAmount,
         proofUrl,
         cloudStoragePath,
         referenceNumber,
@@ -96,15 +78,109 @@ export async function POST(request: Request) {
       },
     });
 
-    // Notify admins of new payment
-    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, phone: true } });
-    const meterInfo = await prisma.meter.findUnique({ where: { id: meterId }, select: { meterNumber: true } });
-    await notifyAdmins({
-      title: "New Payment Submitted",
-      message: `${user?.name} (${user?.phone}) submitted payment for ${quantity} token(s) on meter ${meterInfo?.meterNumber}. Amount: R${(quantity * TOKEN_PRICE).toLocaleString()}`,
-      type: "INFO",
-      link: "/admin/payments",
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { name: true, phone: true },
     });
+    const meterInfo = await prisma.meter.findUnique({
+      where: { id: meterId },
+      select: { meterNumber: true },
+    });
+
+    // Build the proof image URL for AI
+    let imageUrl = proofUrl;
+    if (!imageUrl && cloudStoragePath) {
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "dousyjcui";
+      imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${cloudStoragePath}`;
+    }
+
+    // Run AI verification if we have an image
+    if (imageUrl) {
+      try {
+        const verification = await verifyProofOfPayment({
+          imageUrl,
+          expectedAmount,
+          expectedReference: referenceNumber,
+          expectedDate: paymentDate,
+        });
+
+        console.log("AI verification result:", verification);
+
+        if (verification.autoApprove) {
+          // Auto-approve: find and assign available tokens
+          const availableTokens = await prisma.token.findMany({
+            where: { meterId, status: "AVAILABLE" },
+            take: quantity,
+          });
+
+          if (availableTokens.length >= quantity) {
+            // Update payment to approved
+            await prisma.payment.update({
+              where: { id: payment.id },
+              data: { status: "APPROVED", verifiedAt: new Date() },
+            });
+
+            // Mark tokens as used and link to payment
+            await prisma.token.updateMany({
+              where: { id: { in: availableTokens.map((t) => t.id) } },
+              data: { status: "USED", paymentId: payment.id },
+            });
+
+            // Notify user of auto-approval
+            await createNotification({
+              userId,
+              title: "✅ Payment Auto-Approved!",
+              message: `Your payment of R${expectedAmount.toLocaleString()} for meter ${meterInfo?.meterNumber} was automatically verified and ${quantity} token(s) have been released.`,
+              type: "SUCCESS",
+              link: "/dashboard/history",
+            });
+
+            // Notify admins
+            await notifyAdmins({
+              title: "Payment Auto-Approved",
+              message: `${user?.name}'s payment of R${expectedAmount.toLocaleString()} for meter ${meterInfo?.meterNumber} was auto-approved by AI. Reason: ${verification.reasoning}`,
+              type: "SUCCESS",
+              link: "/admin/payments",
+            });
+
+            return NextResponse.json({ ...payment, status: "APPROVED", autoApproved: true });
+          } else {
+            // Not enough tokens available — approve payment but flag it
+            await notifyAdmins({
+              title: "⚠️ Payment Verified — Not Enough Tokens",
+              message: `${user?.name}'s payment was AI-verified but only ${availableTokens.length} of ${quantity} token(s) are available for meter ${meterInfo?.meterNumber}. Please upload more tokens.`,
+              type: "WARNING",
+              link: "/admin/payments",
+            });
+          }
+        } else {
+          // AI could not auto-approve — send to manual review with AI notes
+          await notifyAdmins({
+            title: "🔍 Payment Needs Manual Review",
+            message: `${user?.name} submitted R${expectedAmount.toLocaleString()} for meter ${meterInfo?.meterNumber}. AI verdict: ${verification.reasoning} (Amount: ${verification.amountMatch ? "✓" : "✗"}, Date: ${verification.dateMatch ? "✓" : verification.dateMatch === null ? "?" : "✗"}, Ref: ${verification.referenceMatch ? "✓" : verification.referenceMatch === null ? "N/A" : "✗"})`,
+            type: "WARNING",
+            link: "/admin/payments",
+          });
+        }
+      } catch (aiError) {
+        console.error("AI verification failed:", aiError);
+        // Fall through to manual review notification
+        await notifyAdmins({
+          title: "New Payment Submitted",
+          message: `${user?.name} (${user?.phone}) submitted payment for ${quantity} token(s) on meter ${meterInfo?.meterNumber}. Amount: R${expectedAmount.toLocaleString()}. AI verification unavailable.`,
+          type: "INFO",
+          link: "/admin/payments",
+        });
+      }
+    } else {
+      // No image — notify admin for manual review
+      await notifyAdmins({
+        title: "New Payment Submitted (No Image)",
+        message: `${user?.name} (${user?.phone}) submitted payment for ${quantity} token(s) on meter ${meterInfo?.meterNumber}. Amount: R${expectedAmount.toLocaleString()}. No proof image uploaded.`,
+        type: "INFO",
+        link: "/admin/payments",
+      });
+    }
 
     return NextResponse.json(payment);
   } catch (error) {
