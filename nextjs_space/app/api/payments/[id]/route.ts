@@ -4,7 +4,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth-options";
-import { getFileUrl } from "@/lib/s3";
 
 export async function GET(
   request: Request,
@@ -32,18 +31,12 @@ export async function GET(
       return NextResponse.json({ error: "Payment not found" }, { status: 404 });
     }
 
-    // Regular users can only see their own payments
     if (userRole !== "ADMIN" && payment.userId !== userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Get signed URL for proof if exists
-    let proofSignedUrl = null;
-    if (payment.cloudStoragePath) {
-      proofSignedUrl = await getFileUrl(payment.cloudStoragePath, false);
-    }
-
-    return NextResponse.json({ ...payment, proofSignedUrl });
+    // Cloudinary URLs are public - use proofUrl directly
+    return NextResponse.json({ ...payment, proofSignedUrl: payment.proofUrl ?? null });
   } catch (error) {
     console.error("Get payment error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
