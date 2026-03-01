@@ -351,18 +351,28 @@ export default function TokensPage() {
                 </div>
 
                 {uploadType === "csv" ? (
-                  <div>
-                    <label className="label">Token Values (one per line or comma-separated)</label>
-                    <textarea
-                      value={csvTokens}
-                      onChange={(e) => setCsvTokens(e.target.value)}
-                      className="input min-h-[150px] font-mono text-sm"
-                      placeholder="12345678901234567890\n98765432109876543210\n..."
-                      required
-                    />
+                  <div className="space-y-3">
+                    <div>
+                      <label className="label">Upload CSV File</label>
+                      <FileUpload
+                        onUploadComplete={() => {}}
+                        onCSVParsed={(tokens) => setCsvTokens(tokens.join("\n"))}
+                        accept=".csv,text/csv"
+                        mode="csv"
+                      />
+                    </div>
+                    <div>
+                      <label className="label">Or paste tokens manually (one per line)</label>
+                      <textarea
+                        value={csvTokens}
+                        onChange={(e) => setCsvTokens(e.target.value)}
+                        className="input min-h-[120px] font-mono text-sm"
+                        placeholder="12345678901234567890&#10;98765432109876543210&#10;..."
+                      />
+                    </div>
                     {csvTokens && (
-                      <p className="text-sm text-gray-500 mt-1">
-                        Found {parseCSVTokens(csvTokens).length} tokens
+                      <p className="text-sm text-green-600 font-medium">
+                        ✓ {parseCSVTokens(csvTokens).length} tokens ready
                       </p>
                     )}
                   </div>
