@@ -40,7 +40,7 @@ export async function GET(
     // Get signed URL for proof if exists
     let proofSignedUrl = null;
     if (payment.cloudStoragePath) {
-      proofSignedUrl = await getFileUrl(payment.cloudStoragePath, payment.isPublic);
+      proofSignedUrl = await getFileUrl(payment.cloudStoragePath, false);
     }
 
     return NextResponse.json({ ...payment, proofSignedUrl });
