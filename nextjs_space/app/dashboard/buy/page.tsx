@@ -20,15 +20,13 @@ export default function BuyTokensPage() {
   const [referenceNumber, setReferenceNumber] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [cloudStoragePath, setCloudStoragePath] = useState("");
-  const [isPublic, setIsPublic] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(1);
 
   const totalAmount = quantity * TOKEN_PRICE;
 
-  const handleUploadComplete = (path: string, pub: boolean) => {
+  const handleUploadComplete = (url: string, path: string) => {
     setCloudStoragePath(path);
-    setIsPublic(pub);
   };
 
   const handleSubmit = async () => {
@@ -51,7 +49,6 @@ export default function BuyTokensPage() {
           meterId: selectedMeter,
           quantity,
           cloudStoragePath,
-          isPublic,
           referenceNumber,
           paymentDate: paymentDate || null,
         }),
