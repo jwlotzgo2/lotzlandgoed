@@ -35,8 +35,11 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Cloudinary URLs are public - use proofUrl directly
-    return NextResponse.json({ ...payment, proofSignedUrl: payment.proofUrl ?? null });
+    // Cloudinary URLs are public - use proofUrl directly, fall back to cloudStoragePath
+    const proofSignedUrl = payment.proofUrl 
+      ?? (payment.cloudStoragePath?.startsWith("http") ? payment.cloudStoragePath : null);
+
+    return NextResponse.json({ ...payment, proofSignedUrl });
   } catch (error) {
     console.error("Get payment error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

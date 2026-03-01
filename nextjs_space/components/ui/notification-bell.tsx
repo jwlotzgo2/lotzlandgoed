@@ -89,9 +89,11 @@ export function NotificationBell() {
               <p className="text-center text-gray-400 text-sm py-8">No notifications yet</p>
             ) : (
               notifications.slice(0, 10).map((n) => (
-                <div
+                <Link
                   key={n.id}
-                  className={`px-4 py-3 border-b border-gray-50 ${!n.isRead ? "bg-blue-50/40" : ""}`}
+                  href={n.link ?? "#"}
+                  onClick={() => setOpen(false)}
+                  className={`block px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.isRead ? "bg-blue-50/40" : ""}`}
                 >
                   <div className="flex items-start gap-2">
                     <span className={`px-1.5 py-0.5 rounded text-xs font-medium flex-shrink-0 mt-0.5 ${typeColor[n.type] ?? typeColor.INFO}`}>
@@ -105,7 +107,7 @@ export function NotificationBell() {
                       </p>
                     </div>
                   </div>
-                </div>
+                </Link>
               ))
             )}
           </div>

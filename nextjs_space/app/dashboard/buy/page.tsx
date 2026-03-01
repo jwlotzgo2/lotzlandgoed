@@ -20,12 +20,14 @@ export default function BuyTokensPage() {
   const [referenceNumber, setReferenceNumber] = useState("");
   const [paymentDate, setPaymentDate] = useState("");
   const [cloudStoragePath, setCloudStoragePath] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(1);
 
   const totalAmount = quantity * TOKEN_PRICE;
 
   const handleUploadComplete = (url: string, path: string) => {
+    setProofUrl(url);
     setCloudStoragePath(path);
   };
 
@@ -48,6 +50,7 @@ export default function BuyTokensPage() {
         body: JSON.stringify({
           meterId: selectedMeter,
           quantity,
+          proofUrl,
           cloudStoragePath,
           referenceNumber,
           paymentDate: paymentDate || null,
