@@ -72,39 +72,33 @@ Respond ONLY with a JSON object in this exact format, no other text:
     let contentBlock: any;
     if (looksLikePdf) {
       try {
-        // Cloudinary secure_url for PDFs may lack extension - try appending it
-        const urlsToTry = [
-          imageUrl,
-          imageUrl.replace("/image/upload/", "/raw/upload/"),
-          imageUrl.replace("/image/upload/", "/raw/upload/") + ".pdf",
-          imageUrl + ".pdf",
-        ];
+        const { v2: cloudinary } = await import("cloudinary");
+        cloudinary.config({
+          cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+          api_key: process.env.CLOUDINARY_API_KEY,
+          api_secret: process.env.CLOUDINARY_API_SECRET,
+        });
 
-        let pdfBuffer: ArrayBuffer | null = null;
-        let successUrl = "";
+        // Extract public_id from URL (remove version prefix)
+        const uploadIndex = imageUrl.indexOf("/upload/");
+        let publicId = imageUrl.slice(uploadIndex + 8).replace(/^v\d+\//, "");
+        console.log("PDF public_id:", publicId);
 
-        for (const url of urlsToTry) {
-          console.log("Trying PDF URL:", url.slice(0, 120));
-          try {
-            const res = await fetch(url);
-            if (res.ok) {
-              const contentType = res.headers.get("content-type") ?? "";
-              console.log("Got response, content-type:", contentType);
-              pdfBuffer = await res.arrayBuffer();
-              successUrl = url;
-              break;
-            }
-            console.log("URL failed with status:", res.status);
-          } catch (fetchErr) {
-            console.log("URL threw error:", fetchErr);
-          }
+        // Generate a short-lived signed download URL using Cloudinary utils
+        const signedUrl = cloudinary.utils.private_download_url(publicId, "pdf", {
+          resource_type: "raw",
+          expires_at: Math.floor(Date.now() / 1000) + 120,
+          attachment: false,
+        });
+
+        console.log("Signed URL:", signedUrl.slice(0, 120));
+
+        const pdfResponse = await fetch(signedUrl);
+        if (!pdfResponse.ok) {
+          throw new Error(`Signed URL fetch failed: ${pdfResponse.status}`);
         }
 
-        if (!pdfBuffer) {
-          throw new Error(`All URL attempts failed for: ${imageUrl.slice(0, 80)}`);
-        }
-
-        console.log("PDF fetched successfully from:", successUrl.slice(0, 120));
+        const pdfBuffer = await pdfResponse.arrayBuffer();
         const base64 = Buffer.from(pdfBuffer).toString("base64");
         contentBlock = {
           type: "document",
