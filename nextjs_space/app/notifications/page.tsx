@@ -5,6 +5,9 @@ import { Bell, CheckCheck, AlertCircle, CheckCircle, Info, AlertTriangle } from 
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Loading } from "@/components/ui/loading";
+import { Header } from "@/components/ui/header";
+import { PageLoading } from "@/components/ui/loading";
+import { useSession } from "next-auth/react";
 
 interface Notification {
   id: string;
@@ -48,6 +51,7 @@ const typeConfig = {
 };
 
 export default function NotificationsPage() {
+  const { status } = useSession() || {};
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"ALL" | "UNREAD">("ALL");
@@ -73,16 +77,18 @@ export default function NotificationsPage() {
     fetchNotifications();
   }, []);
 
+  if (status === "loading") return <PageLoading />;
+
   const filtered = filter === "UNREAD"
     ? notifications.filter((n) => !n.isRead)
     : notifications;
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  if (loading) return <Loading text="Loading notifications..." />;
-
   return (
-    <div className="max-w-2xl mx-auto px-4 py-8">
+    <div className="min-h-screen bg-[#f8f9fa]">
+      <Header />
+      <main className="max-w-2xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">
@@ -191,6 +197,7 @@ export default function NotificationsPage() {
           })}
         </div>
       )}
+      </main>
     </div>
   );
 }
