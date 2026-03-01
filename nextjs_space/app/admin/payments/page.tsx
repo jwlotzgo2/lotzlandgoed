@@ -291,14 +291,21 @@ export default function PaymentsPage() {
                     <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
                   ) : proofUrl ? (
                     <div className="w-full">
-                      {proofUrl.includes(".pdf") ? (
-                        <div className="p-6 text-center">
-                          <p className="text-gray-600 mb-4">PDF Document</p>
+                      {(proofUrl.toLowerCase().includes(".pdf") || 
+                        proofUrl.includes("application/pdf") ||
+                        selectedPayment.cloudStoragePath?.toLowerCase().includes(".pdf")) ? (
+                        <div className="w-full">
+                          <iframe
+                            src={proofUrl}
+                            className="w-full rounded border border-gray-200"
+                            style={{ height: "500px" }}
+                            title="Proof of Payment"
+                          />
                           <a
                             href={proofUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="btn-primary inline-flex items-center gap-2"
+                            className="btn-primary inline-flex items-center gap-2 mt-3"
                           >
                             <Download className="w-4 h-4" />
                             Download PDF
