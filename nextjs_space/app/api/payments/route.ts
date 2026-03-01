@@ -90,7 +90,6 @@ export async function POST(request: Request) {
         totalAmount: quantity * TOKEN_PRICE,
         proofUrl,
         cloudStoragePath,
-        isPublic: isPublic || false,
         referenceNumber,
         paymentDate: paymentDate ? new Date(paymentDate) : null,
         status: "PENDING",
