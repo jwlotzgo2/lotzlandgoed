@@ -4,7 +4,7 @@ import { useState, useRef } from "react";
 import { Upload, X, CheckCircle, Loader2, FileText } from "lucide-react";
 
 interface FileUploadProps {
-  onUploadComplete: (url: string, path: string, isPdf: boolean, aiScanUrl?: string) => void;
+  onUploadComplete: (url: string, path: string, isPdf: boolean, fileBase64?: string, fileMimeType?: string) => void;
   onCSVParsed?: (tokens: string[]) => void;
   accept?: string;
   maxSize?: number;
@@ -86,14 +86,14 @@ export function FileUpload({
 
       if (!uploadRes.ok) throw new Error("Upload failed");
 
-      const { fileUrl, cloudStoragePath, resourceType, format, aiScanUrl } = await uploadRes.json();
+      const { fileUrl, cloudStoragePath, resourceType, format, fileBase64, fileMimeType } = await uploadRes.json();
       const isPdf = file.type === "application/pdf" 
         || file.name.toLowerCase().endsWith(".pdf")
         || resourceType === "raw"
         || format === "pdf";
 
       setUploaded(true);
-      onUploadComplete(fileUrl, cloudStoragePath, isPdf, aiScanUrl);
+      onUploadComplete(fileUrl, cloudStoragePath, isPdf, fileBase64, fileMimeType);
     } catch {
       setError("Upload failed. Please try again.");
       setFileName(null);

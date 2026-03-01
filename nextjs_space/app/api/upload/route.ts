@@ -46,14 +46,10 @@ export async function POST(request: Request) {
       format: result.format,
     });
 
-    // For PDFs, generate a public image URL of the first page for AI scanning
-    let aiScanUrl = result.secure_url;
-    if (isPdfFile || result.format === "pdf") {
-      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "dousyjcui";
-      // Cloudinary can render first page of PDF as JPG using /image/upload/ with pg_1 transformation
-      aiScanUrl = `https://res.cloudinary.com/${cloudName}/image/upload/pg_1,f_jpg/${result.public_id}.jpg`;
-      console.log("PDF image URL for AI:", aiScanUrl);
-    }
+    // For AI scanning: since Cloudinary access may be restricted,
+    // return the raw base64 of the file so the payments route can send it directly to Claude
+    const fileBase64 = buffer.toString("base64");
+    const fileMimeType = isPdfFile ? "application/pdf" : file.type;
 
     return NextResponse.json({
       fileUrl: result.secure_url,
@@ -61,7 +57,8 @@ export async function POST(request: Request) {
       url: result.secure_url,
       resourceType: result.resource_type,
       format: result.format,
-      aiScanUrl,
+      fileBase64,
+      fileMimeType,
     });
   } catch (error) {
     console.error("Cloudinary upload error:", error);

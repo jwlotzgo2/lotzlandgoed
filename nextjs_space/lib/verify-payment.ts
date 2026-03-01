@@ -15,11 +15,15 @@ export async function verifyProofOfPayment({
   expectedAmount,
   expectedReference,
   expectedDate,
+  fileBase64,
+  fileMimeType,
 }: {
   imageUrl: string;
   expectedAmount: number;
   expectedReference?: string | null;
   expectedDate?: string | null;
+  fileBase64?: string;
+  fileMimeType?: string;
 }): Promise<VerificationResult> {
   try {
     const today = new Date().toISOString().split("T")[0];
@@ -56,12 +60,25 @@ Respond ONLY with a JSON object in this exact format, no other text:
   "reasoning": "<one clear sentence explaining your decision>"
 }`;
 
-    // imageUrl is always an image (PDFs are converted to JPG by Cloudinary at upload time)
-    console.log("verify-payment: scanning url =", imageUrl.slice(0, 100));
-    const contentBlock = {
-      type: "image",
-      source: { type: "url", url: imageUrl },
-    };
+    // Use base64 if available (bypasses Cloudinary access restrictions), else URL
+    let contentBlock: any;
+    if (fileBase64 && fileMimeType) {
+      console.log("verify-payment: using base64, mimeType =", fileMimeType);
+      const isPdf = fileMimeType === "application/pdf";
+      contentBlock = isPdf ? {
+        type: "document",
+        source: { type: "base64", media_type: "application/pdf", data: fileBase64 },
+      } : {
+        type: "image",
+        source: { type: "base64", media_type: fileMimeType, data: fileBase64 },
+      };
+    } else {
+      console.log("verify-payment: using URL =", imageUrl.slice(0, 100));
+      contentBlock = {
+        type: "image",
+        source: { type: "url", url: imageUrl },
+      };
+    }
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -69,6 +86,7 @@ Respond ONLY with a JSON object in this exact format, no other text:
         "Content-Type": "application/json",
         "x-api-key": process.env.ANTHROPIC_API_KEY!,
         "anthropic-version": "2023-06-01",
+        "anthropic-beta": "pdfs-2024-09-25",
       },
       body: JSON.stringify({
         model: "claude-opus-4-6",
