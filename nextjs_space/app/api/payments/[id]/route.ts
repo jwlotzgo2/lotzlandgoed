@@ -35,9 +35,12 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 403 });
     }
 
-    // Cloudinary URLs are public - use proofUrl directly, fall back to cloudStoragePath
-    const proofSignedUrl = payment.proofUrl 
-      ?? (payment.cloudStoragePath?.startsWith("http") ? payment.cloudStoragePath : null);
+    // Build proof URL - use proofUrl if available, otherwise construct from cloudStoragePath
+    let proofSignedUrl: string | null = payment.proofUrl ?? null;
+    if (!proofSignedUrl && payment.cloudStoragePath) {
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "dousyjcui";
+      proofSignedUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${payment.cloudStoragePath}`;
+    }
 
     return NextResponse.json({ ...payment, proofSignedUrl });
   } catch (error) {
