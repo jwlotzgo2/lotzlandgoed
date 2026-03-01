@@ -106,8 +106,9 @@ Respond ONLY with a JSON object in this exact format, no other text:
     });
 
     if (!response.ok) {
-      console.error("Claude API error:", await response.text());
-      return failResult("Claude API request failed");
+      const errorText = await response.text();
+      console.error("Claude API error:", errorText);
+      return failResult(`Claude API error: ${errorText.slice(0, 200)}`);
     }
 
     const data = await response.json();
