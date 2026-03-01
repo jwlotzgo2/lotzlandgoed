@@ -204,10 +204,21 @@ export default function PaymentsPage() {
                   {new Date(payment.createdAt).toLocaleDateString()}
                 </td>
                 <td className="table-cell">
-                  <span className={`${getStatusClass(payment.status)} flex items-center gap-1 w-fit`}>
-                    {getStatusIcon(payment.status)}
-                    {payment.status}
-                  </span>
+                  <div className="flex flex-col gap-1">
+                    <span className={`${getStatusClass(payment.status)} flex items-center gap-1 w-fit`}>
+                      {getStatusIcon(payment.status)}
+                      {payment.status}
+                    </span>
+                    {payment.status === "APPROVED" && (
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
+                        payment.aiAutoApproved
+                          ? "bg-blue-100 text-blue-700"
+                          : "bg-gray-100 text-gray-500"
+                      }`}>
+                        {payment.aiAutoApproved ? "🤖 AI" : "👤 Admin"}
+                      </span>
+                    )}
+                  </div>
                 </td>
                 <td className="table-cell">
                   <button
