@@ -130,6 +130,9 @@ export async function POST(request: Request) {
                 aiReferenceMatch: verification.referenceMatch,
                 aiDateMatch: verification.dateMatch,
                 aiReasoning: verification.reasoning,
+              },
+            });
+
             await prisma.token.updateMany({
               where: { id: { in: availableTokens.map((t) => t.id) } },
               data: { status: "USED", paymentId: payment.id },
