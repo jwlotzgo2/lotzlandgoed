@@ -30,10 +30,11 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(bytes);
     const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
-    // Upload to Cloudinary
+    // Upload to Cloudinary - force public delivery
     const result = await cloudinary.uploader.upload(base64, {
       folder: "lotz-landgoed",
       resource_type: "auto",
+      access_control: [{ access_type: "anonymous" }],
     });
 
     console.log("Cloudinary upload result:", {

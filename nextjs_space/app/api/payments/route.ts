@@ -87,12 +87,8 @@ export async function POST(request: Request) {
       select: { meterNumber: true },
     });
 
-    // Build the proof image URL for AI
-    let imageUrl = proofUrl;
-    if (!imageUrl && cloudStoragePath) {
-      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "dousyjcui";
-      imageUrl = `https://res.cloudinary.com/${cloudName}/image/upload/${cloudStoragePath}`;
-    }
+    // Build the proof image URL for AI - always prefer the stored proofUrl (Cloudinary secure_url)
+    const imageUrl = proofUrl || null;
 
     // Run AI verification if we have an image
     if (imageUrl) {
