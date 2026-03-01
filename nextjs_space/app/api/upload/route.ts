@@ -36,10 +36,19 @@ export async function POST(request: Request) {
       resource_type: "auto",
     });
 
+    console.log("Cloudinary upload result:", {
+      secure_url: result.secure_url,
+      public_id: result.public_id,
+      resource_type: result.resource_type,
+      format: result.format,
+    });
+
     return NextResponse.json({
       fileUrl: result.secure_url,
       cloudStoragePath: result.public_id,
       url: result.secure_url,
+      resourceType: result.resource_type,
+      format: result.format,
     });
   } catch (error) {
     console.error("Cloudinary upload error:", error);

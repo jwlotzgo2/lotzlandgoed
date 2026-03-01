@@ -72,33 +72,39 @@ Respond ONLY with a JSON object in this exact format, no other text:
     let contentBlock: any;
     if (looksLikePdf) {
       try {
-        // Cloudinary PDFs: try raw/upload with and without .pdf extension
-        const baseUrl = imageUrl.replace("/image/upload/", "/raw/upload/");
+        // Cloudinary secure_url for PDFs may lack extension - try appending it
         const urlsToTry = [
-          baseUrl,
-          baseUrl + ".pdf",
           imageUrl,
+          imageUrl.replace("/image/upload/", "/raw/upload/"),
+          imageUrl.replace("/image/upload/", "/raw/upload/") + ".pdf",
           imageUrl + ".pdf",
         ];
 
         let pdfBuffer: ArrayBuffer | null = null;
-        let lastError = "";
+        let successUrl = "";
 
         for (const url of urlsToTry) {
           console.log("Trying PDF URL:", url.slice(0, 120));
-          const res = await fetch(url);
-          if (res.ok) {
-            pdfBuffer = await res.arrayBuffer();
-            console.log("PDF fetched successfully from:", url.slice(0, 120));
-            break;
+          try {
+            const res = await fetch(url);
+            if (res.ok) {
+              const contentType = res.headers.get("content-type") ?? "";
+              console.log("Got response, content-type:", contentType);
+              pdfBuffer = await res.arrayBuffer();
+              successUrl = url;
+              break;
+            }
+            console.log("URL failed with status:", res.status);
+          } catch (fetchErr) {
+            console.log("URL threw error:", fetchErr);
           }
-          lastError = `${res.status} for ${url.slice(0, 80)}`;
         }
 
         if (!pdfBuffer) {
-          throw new Error(`All URL attempts failed. Last: ${lastError}`);
+          throw new Error(`All URL attempts failed for: ${imageUrl.slice(0, 80)}`);
         }
 
+        console.log("PDF fetched successfully from:", successUrl.slice(0, 120));
         const base64 = Buffer.from(pdfBuffer).toString("base64");
         contentBlock = {
           type: "document",

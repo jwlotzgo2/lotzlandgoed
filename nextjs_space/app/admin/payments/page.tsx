@@ -48,9 +48,10 @@ export default function PaymentsPage() {
       const url = filter === "ALL" ? "/api/payments" : `/api/payments?status=${filter}`;
       const res = await fetch(url);
       const data = await res.json();
-      setPayments(data ?? []);
+      setPayments(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error("Error fetching payments:", error);
+      setPayments([]);
     } finally {
       setLoading(false);
     }
@@ -403,6 +404,15 @@ export default function PaymentsPage() {
                   <span className={getStatusClass(selectedPayment.status)}>
                     {selectedPayment.status}
                   </span>
+                  {selectedPayment.status === "APPROVED" && (
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      selectedPayment.aiAutoApproved
+                        ? "bg-blue-100 text-blue-700"
+                        : "bg-gray-100 text-gray-600"
+                    }`}>
+                      {selectedPayment.aiAutoApproved ? "🤖 AI Approved" : "👤 Admin Approved"}
+                    </span>
+                  )}
                 </div>
 
                 {selectedPayment.status === "PENDING" ? (
