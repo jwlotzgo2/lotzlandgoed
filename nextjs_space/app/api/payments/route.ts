@@ -98,10 +98,10 @@ export async function POST(request: Request) {
 
     // Notify admins of new payment
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, phone: true } });
-    const meter = await prisma.meter.findUnique({ where: { id: meterId }, select: { meterNumber: true } });
+    const meterInfo = await prisma.meter.findUnique({ where: { id: meterId }, select: { meterNumber: true } });
     await notifyAdmins({
       title: "New Payment Submitted",
-      message: `${user?.name} (${user?.phone}) submitted payment for ${quantity} token(s) on meter ${meter?.meterNumber}. Amount: R${(quantity * TOKEN_PRICE).toLocaleString()}`,
+      message: `${user?.name} (${user?.phone}) submitted payment for ${quantity} token(s) on meter ${meterInfo?.meterNumber}. Amount: R${(quantity * TOKEN_PRICE).toLocaleString()}`,
       type: "INFO",
       link: "/admin/payments",
     });
