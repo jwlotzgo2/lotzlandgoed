@@ -58,19 +58,34 @@ Respond ONLY with a JSON object in this exact format, no other text:
   "reasoning": "<one clear sentence explaining your decision>"
 }`;
 
+    console.log("verify-payment: isPdf =", isPdf, "imageUrl =", imageUrl.slice(0, 80));
+
     // For PDFs, fetch and convert to base64 for Claude's document API
     let contentBlock: any;
     if (isPdf) {
       try {
-        const pdfResponse = await fetch(imageUrl);
+        // Try fetching the PDF - add format hint for Cloudinary
+        const fetchUrl = imageUrl.includes("cloudinary.com") && !imageUrl.includes(".pdf")
+          ? imageUrl + ".pdf"
+          : imageUrl;
+        
+        const pdfResponse = await fetch(fetchUrl, {
+          headers: { "Accept": "application/pdf,*/*" },
+        });
+        
+        if (!pdfResponse.ok) {
+          throw new Error(`Fetch failed: ${pdfResponse.status}`);
+        }
+        
         const pdfBuffer = await pdfResponse.arrayBuffer();
         const base64 = Buffer.from(pdfBuffer).toString("base64");
         contentBlock = {
           type: "document",
           source: { type: "base64", media_type: "application/pdf", data: base64 },
         };
-      } catch {
-        return failResult("Could not fetch PDF for verification");
+      } catch (e) {
+        console.error("PDF fetch error:", e);
+        return failResult(`Could not fetch PDF: ${String(e).slice(0, 100)}`);
       }
     } else {
       contentBlock = {
