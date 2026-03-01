@@ -363,14 +363,18 @@ export default function PaymentsPage() {
                       <div className="text-center p-2 bg-gray-50 rounded-lg">
                         <p className="text-xs text-gray-400 mb-1">Extracted Date</p>
                         <p className="font-semibold text-sm text-gray-900">
-                          {selectedPayment.aiExtractedDate ?? <span className="text-gray-400">—</span>}
+                          {selectedPayment.aiExtractedDate
+                            ? selectedPayment.aiExtractedDate
+                            : <span className="text-gray-400">—</span>}
                         </p>
                         <MatchBadge value={selectedPayment.aiDateMatch} label="In Range" />
                       </div>
                       <div className="text-center p-2 bg-gray-50 rounded-lg">
                         <p className="text-xs text-gray-400 mb-1">Extracted Ref</p>
                         <p className="font-semibold text-sm text-gray-900 truncate">
-                          {selectedPayment.aiExtractedRef ?? <span className="text-gray-400">—</span>}
+                          {selectedPayment.aiExtractedRef
+                            ? selectedPayment.aiExtractedRef
+                            : <span className="text-gray-400">—</span>}
                         </p>
                         <MatchBadge value={selectedPayment.aiReferenceMatch} />
                       </div>
