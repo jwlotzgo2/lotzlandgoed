@@ -22,15 +22,17 @@ export default function BuyTokensPage() {
   const [cloudStoragePath, setCloudStoragePath] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [proofIsPdf, setProofIsPdf] = useState(false);
+  const [aiScanUrl, setAiScanUrl] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [step, setStep] = useState(1);
 
   const totalAmount = quantity * TOKEN_PRICE;
 
-  const handleUploadComplete = (url: string, path: string, isPdf: boolean) => {
+  const handleUploadComplete = (url: string, path: string, isPdf: boolean, aiUrl?: string) => {
     setProofUrl(url);
     setCloudStoragePath(path);
     setProofIsPdf(isPdf);
+    setAiScanUrl(aiUrl || url);
   };
 
   const handleSubmit = async () => {
@@ -57,6 +59,7 @@ export default function BuyTokensPage() {
           referenceNumber,
           paymentDate: paymentDate || null,
           proofIsPdf,
+          aiScanUrl,
         }),
       });
 

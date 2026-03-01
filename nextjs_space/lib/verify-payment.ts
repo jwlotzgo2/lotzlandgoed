@@ -15,13 +15,11 @@ export async function verifyProofOfPayment({
   expectedAmount,
   expectedReference,
   expectedDate,
-  isPdf = false,
 }: {
   imageUrl: string;
   expectedAmount: number;
   expectedReference?: string | null;
   expectedDate?: string | null;
-  isPdf?: boolean;
 }): Promise<VerificationResult> {
   try {
     const today = new Date().toISOString().split("T")[0];
@@ -58,67 +56,12 @@ Respond ONLY with a JSON object in this exact format, no other text:
   "reasoning": "<one clear sentence explaining your decision>"
 }`;
 
-    // Detect PDF: use passed flag OR sniff from URL/content-type
-    const urlLower = imageUrl.toLowerCase();
-    const looksLikePdf = isPdf 
-      || urlLower.includes(".pdf")
-      || urlLower.includes("application/pdf")
-      // Cloudinary PDFs stored as raw: no image extension at end of path
-      || (urlLower.includes("cloudinary.com") && !/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/.test(urlLower));
-
-    console.log("verify-payment: isPdf =", isPdf, "looksLikePdf =", looksLikePdf, "url =", imageUrl.slice(0, 80));
-
-    // For PDFs, fetch and convert to base64 for Claude's document API
-    let contentBlock: any;
-    if (looksLikePdf) {
-      try {
-        const { v2: cloudinary } = await import("cloudinary");
-        cloudinary.config({
-          cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-          api_key: process.env.CLOUDINARY_API_KEY,
-          api_secret: process.env.CLOUDINARY_API_SECRET,
-        });
-
-        // Extract public_id from URL (remove version prefix)
-        const uploadIndex = imageUrl.indexOf("/upload/");
-        let publicId = imageUrl.slice(uploadIndex + 8).replace(/^v\d+\//, "");
-        console.log("PDF public_id:", publicId);
-
-        // Try both resource types - Cloudinary may store PDF under image or raw
-        let pdfBuffer: ArrayBuffer | null = null;
-        for (const resourceType of ["image", "raw"] as const) {
-          const signedUrl = cloudinary.utils.private_download_url(publicId, "pdf", {
-            resource_type: resourceType,
-            expires_at: Math.floor(Date.now() / 1000) + 120,
-            attachment: false,
-          });
-          console.log(`Trying resource_type=${resourceType}, url:`, signedUrl.slice(0, 120));
-          const res = await fetch(signedUrl);
-          console.log(`Status: ${res.status}, content-type: ${res.headers.get("content-type")}`);
-          if (res.ok) {
-            pdfBuffer = await res.arrayBuffer();
-            break;
-          }
-        }
-
-        if (!pdfBuffer) {
-          throw new Error(`Signed URL fetch failed for both resource types`);
-        }
-        const base64 = Buffer.from(pdfBuffer).toString("base64");
-        contentBlock = {
-          type: "document",
-          source: { type: "base64", media_type: "application/pdf", data: base64 },
-        };
-      } catch (e) {
-        console.error("PDF fetch error:", e);
-        return failResult(`Could not fetch PDF: ${String(e).slice(0, 150)}`);
-      }
-    } else {
-      contentBlock = {
-        type: "image",
-        source: { type: "url", url: imageUrl },
-      };
-    }
+    // imageUrl is always an image (PDFs are converted to JPG by Cloudinary at upload time)
+    console.log("verify-payment: scanning url =", imageUrl.slice(0, 100));
+    const contentBlock = {
+      type: "image",
+      source: { type: "url", url: imageUrl },
+    };
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -126,7 +69,6 @@ Respond ONLY with a JSON object in this exact format, no other text:
         "Content-Type": "application/json",
         "x-api-key": process.env.ANTHROPIC_API_KEY!,
         "anthropic-version": "2023-06-01",
-        "anthropic-beta": "pdfs-2024-09-25",
       },
       body: JSON.stringify({
         model: "claude-opus-4-6",

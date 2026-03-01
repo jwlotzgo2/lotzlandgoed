@@ -30,7 +30,9 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(bytes);
     const base64 = `data:${file.type};base64,${buffer.toString("base64")}`;
 
-    // Upload to Cloudinary - force public delivery
+    const isPdfFile = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
+    // Upload to Cloudinary
     const result = await cloudinary.uploader.upload(base64, {
       folder: "lotz-landgoed",
       resource_type: "auto",
@@ -44,12 +46,22 @@ export async function POST(request: Request) {
       format: result.format,
     });
 
+    // For PDFs, generate a public image URL of the first page for AI scanning
+    let aiScanUrl = result.secure_url;
+    if (isPdfFile || result.format === "pdf") {
+      const cloudName = process.env.CLOUDINARY_CLOUD_NAME || "dousyjcui";
+      // Cloudinary can render first page of PDF as JPG using /image/upload/ with pg_1 transformation
+      aiScanUrl = `https://res.cloudinary.com/${cloudName}/image/upload/pg_1,f_jpg/${result.public_id}.jpg`;
+      console.log("PDF image URL for AI:", aiScanUrl);
+    }
+
     return NextResponse.json({
       fileUrl: result.secure_url,
       cloudStoragePath: result.public_id,
       url: result.secure_url,
       resourceType: result.resource_type,
       format: result.format,
+      aiScanUrl,
     });
   } catch (error) {
     console.error("Cloudinary upload error:", error);

@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     const userId = (session.user as any)?.id;
-    const { meterId, quantity, proofUrl, cloudStoragePath, referenceNumber, paymentDate, proofIsPdf } =
+    const { meterId, quantity, proofUrl, cloudStoragePath, referenceNumber, paymentDate, proofIsPdf, aiScanUrl } =
       await request.json();
 
     if (!meterId || !quantity || quantity < 1) {
@@ -87,8 +87,8 @@ export async function POST(request: Request) {
       select: { meterNumber: true },
     });
 
-    // Build the proof image URL for AI - always prefer the stored proofUrl (Cloudinary secure_url)
-    const imageUrl = proofUrl || null;
+    // Use aiScanUrl for AI (PDF converted to image), fall back to proofUrl
+    const imageUrl = aiScanUrl || proofUrl || null;
 
     // Run AI verification if we have an image
     if (imageUrl) {
@@ -98,7 +98,6 @@ export async function POST(request: Request) {
           expectedAmount,
           expectedReference: referenceNumber,
           expectedDate: paymentDate,
-          isPdf: proofIsPdf ?? false,
         });
 
         console.log("AI verification result:", verification);
