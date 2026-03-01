@@ -70,6 +70,8 @@ export default function PaymentsPage() {
       const res = await fetch(`/api/payments/${payment.id}`);
       const data = await res.json();
       setProofUrl(data?.proofSignedUrl ?? null);
+      // Merge full detail (includes AI fields) into selectedPayment
+      setSelectedPayment(prev => prev ? { ...prev, ...data } : data);
     } catch (error) {
       console.error("Error fetching proof:", error);
       toast.error("Failed to load payment proof");
@@ -337,7 +339,7 @@ export default function PaymentsPage() {
               </div>
 
               {/* AI Verification Panel */}
-              {(selectedPayment.aiVerified !== undefined && selectedPayment.aiVerified !== null || selectedPayment.aiReasoning) && (
+              {(selectedPayment.aiReasoning != null || selectedPayment.aiExtractedAmount != null || selectedPayment.aiVerified != null) && (
                 <div className="border border-gray-200 rounded-xl overflow-hidden">
                   <div className={`px-4 py-3 flex items-center justify-between ${
                     selectedPayment.aiAutoApproved ? "bg-green-50" :
