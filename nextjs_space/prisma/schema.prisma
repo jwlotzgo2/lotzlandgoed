@@ -1,0 +1,104 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum TokenStatus {
+  AVAILABLE
+  USED
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  phone              String    @unique
+  email              String?   @unique
+  name               String
+  password           String
+  role               Role      @default(USER)
+  isActive           Boolean   @default(true)
+  mustChangePassword Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  meters   Meter[]
+  payments Payment[]
+}
+
+model Meter {
+  id           String   @id @default(cuid())
+  meterNumber  String   @unique
+  address      String?
+  userId       String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  user         User?        @relation(fields: [userId], references: [id])
+  tokens       Token[]
+  payments     Payment[]
+}
+
+model TokenSheet {
+  id               String   @id @default(cuid())
+  name             String
+  fileUrl          String?
+  cloudStoragePath String?
+  isPublic         Boolean  @default(false)
+  uploadType       String   @default("csv")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tokens Token[]
+}
+
+model Token {
+  id             String      @id @default(cuid())
+  tokenValue     String      @unique
+  status         TokenStatus @default(AVAILABLE)
+  meterId        String?
+  tokenSheetId   String?
+  paymentId      String?
+  revealedAt     DateTime?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  meter       Meter?      @relation(fields: [meterId], references: [id])
+  tokenSheet  TokenSheet? @relation(fields: [tokenSheetId], references: [id])
+  payment     Payment?    @relation(fields: [paymentId], references: [id])
+}
+
+model Payment {
+  id               String        @id @default(cuid())
+  userId           String
+  meterId          String
+  quantity         Int
+  totalAmount      Float
+  proofUrl         String?
+  cloudStoragePath String?
+  referenceNumber  String?
+  paymentDate      DateTime?
+  status           PaymentStatus @default(PENDING)
+  rejectionReason  String?
+  verifiedAt       DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  user   User    @relation(fields: [userId], references: [id])
+  meter  Meter   @relation(fields: [meterId], references: [id])
+  tokens Token[]
+}
