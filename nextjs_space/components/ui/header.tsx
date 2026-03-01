@@ -3,13 +3,29 @@
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Zap, LogOut, User, Settings } from "lucide-react";
+import { Zap, LogOut, Menu, X } from "lucide-react";
+import { useState } from "react";
+import { NotificationBell } from "@/components/ui/notification-bell";
 
 export function Header() {
   const { data: session } = useSession() || {};
   const pathname = usePathname();
   const user = session?.user as any;
   const isAdmin = user?.role === "ADMIN";
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const navLinks = isAdmin
+    ? [
+        { href: "/admin", label: "Dashboard" },
+        { href: "/admin/payments", label: "Payments" },
+        { href: "/admin/tokens", label: "Tokens" },
+        { href: "/admin/users", label: "Users" },
+      ]
+    : [
+        { href: "/dashboard", label: "Home" },
+        { href: "/dashboard/buy", label: "Buy Tokens" },
+        { href: "/dashboard/history", label: "History" },
+      ];
 
   return (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -20,42 +36,73 @@ export function Header() {
             <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center">
               <Zap className="w-5 h-5 text-white" />
             </div>
-            <span className="font-semibold text-gray-900 hidden sm:block">
-              Lotz Landgoed
-            </span>
+            <span className="font-semibold text-gray-900">Lotz Landgoed</span>
           </Link>
 
-          {/* Nav links */}
-          <nav className="flex items-center gap-1">
-            {isAdmin ? (
-              <>
-                <NavLink href="/admin" active={pathname === "/admin"}>Dashboard</NavLink>
-                <NavLink href="/admin/payments" active={pathname === "/admin/payments"}>Payments</NavLink>
-                <NavLink href="/admin/tokens" active={pathname === "/admin/tokens"}>Tokens</NavLink>
-                <NavLink href="/admin/users" active={pathname === "/admin/users"}>Users</NavLink>
-              </>
-            ) : (
-              <>
-                <NavLink href="/dashboard" active={pathname === "/dashboard"}>Home</NavLink>
-                <NavLink href="/dashboard/buy" active={pathname === "/dashboard/buy"}>Buy Tokens</NavLink>
-                <NavLink href="/dashboard/history" active={pathname === "/dashboard/history"}>History</NavLink>
-              </>
-            )}
+          {/* Desktop nav */}
+          <nav className="hidden md:flex items-center gap-1">
+            {navLinks.map((link) => (
+              <NavLink key={link.href} href={link.href} active={pathname === link.href}>
+                {link.label}
+              </NavLink>
+            ))}
           </nav>
 
-          {/* User menu */}
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-gray-600 hidden sm:block">{user?.name}</span>
+          {/* Desktop user menu */}
+          <div className="hidden md:flex items-center gap-3">
+            <NotificationBell />
+            <span className="text-sm text-gray-600">{user?.name}</span>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
               className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-600 transition-colors px-2 py-1 rounded-md hover:bg-red-50"
             >
               <LogOut className="w-4 h-4" />
-              <span className="hidden sm:block">Sign out</span>
+              Sign out
+            </button>
+          </div>
+
+          {/* Mobile hamburger */}
+          <div className="flex items-center gap-2 md:hidden">
+            <NotificationBell />
+            <button
+              className="p-2 rounded-lg text-gray-600 hover:bg-gray-100"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              {menuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
       </div>
+
+      {/* Mobile menu */}
+      {menuOpen && (
+        <div className="md:hidden border-t border-gray-100 bg-white px-4 py-3 space-y-1">
+          {navLinks.map((link) => (
+            <Link
+              key={link.href}
+              href={link.href}
+              onClick={() => setMenuOpen(false)}
+              className={`block px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                pathname === link.href
+                  ? "bg-green-50 text-green-700"
+                  : "text-gray-600 hover:bg-gray-50"
+              }`}
+            >
+              {link.label}
+            </Link>
+          ))}
+          <div className="pt-2 border-t border-gray-100 mt-2">
+            <p className="px-3 py-1 text-xs text-gray-400">{user?.name}</p>
+            <button
+              onClick={() => signOut({ callbackUrl: "/login" })}
+              className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-lg w-full"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
+          </div>
+        </div>
+      )}
     </header>
   );
 }

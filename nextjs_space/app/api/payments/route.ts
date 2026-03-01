@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+import { notifyAdmins } from "@/lib/notifications";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -94,6 +94,16 @@ export async function POST(request: Request) {
         paymentDate: paymentDate ? new Date(paymentDate) : null,
         status: "PENDING",
       },
+    });
+
+    // Notify admins of new payment
+    const user = await prisma.user.findUnique({ where: { id: userId }, select: { name: true, phone: true } });
+    const meter = await prisma.meter.findUnique({ where: { id: meterId }, select: { meterNumber: true } });
+    await notifyAdmins({
+      title: "New Payment Submitted",
+      message: `${user?.name} (${user?.phone}) submitted payment for ${quantity} token(s) on meter ${meter?.meterNumber}. Amount: R${(quantity * TOKEN_PRICE).toLocaleString()}`,
+      type: "INFO",
+      link: "/admin/payments",
     });
 
     return NextResponse.json(payment);

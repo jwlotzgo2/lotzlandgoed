@@ -1,4 +1,4 @@
-export const dynamic = "force-dynamic";
+import { createNotification } from "@/lib/notifications";
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
@@ -50,6 +50,14 @@ export async function POST(
         },
       });
 
+      await createNotification({
+        userId: payment.userId,
+        title: "Payment Rejected",
+        message: `Your payment for meter ${payment.meter.meterNumber} was rejected. Reason: ${rejectionReason || "Payment verification failed"}`,
+        type: "ERROR",
+        link: "/dashboard/history",
+      });
+
       return NextResponse.json({ success: true, status: "REJECTED" });
     }
 
@@ -97,6 +105,14 @@ export async function POST(
       include: {
         tokens: { select: { id: true, tokenValue: true, status: true } },
       },
+    });
+
+    await createNotification({
+      userId: payment.userId,
+      title: "Payment Approved — Tokens Released!",
+      message: `Your payment for meter ${payment.meter.meterNumber} was approved. ${payment.quantity} token(s) have been released to your account.`,
+      type: "SUCCESS",
+      link: "/dashboard/history",
     });
 
     return NextResponse.json({

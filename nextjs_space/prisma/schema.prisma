@@ -24,6 +24,19 @@ enum TokenStatus {
   USED
 }
 
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   @default("INFO")
+  isRead    Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
 model User {
   id                 String    @id @default(cuid())
   phone              String    @unique
@@ -36,8 +49,9 @@ model User {
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
-  meters   Meter[]
-  payments Payment[]
+  meters        Meter[]
+  payments      Payment[]
+  notifications Notification[]
 }
 
 model Meter {
@@ -60,6 +74,7 @@ model TokenSheet {
   cloudStoragePath String?
   isPublic         Boolean  @default(false)
   uploadType       String   @default("csv")
+  isParsed         Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
