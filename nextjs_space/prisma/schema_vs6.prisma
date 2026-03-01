@@ -113,18 +113,6 @@ model Payment {
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
 
-  // AI verification fields
-  aiVerified          Boolean?
-  aiAutoApproved      Boolean?
-  aiConfident         Boolean?
-  aiExtractedAmount   Float?
-  aiExtractedRef      String?
-  aiExtractedDate     String?
-  aiAmountMatch       Boolean?
-  aiReferenceMatch    Boolean?
-  aiDateMatch         Boolean?
-  aiReasoning         String?
-
   user   User    @relation(fields: [userId], references: [id])
   meter  Meter   @relation(fields: [meterId], references: [id])
   tokens Token[]

@@ -114,13 +114,22 @@ export async function POST(request: Request) {
           });
 
           if (availableTokens.length >= quantity) {
-            // Update payment to approved
+            // Update payment to approved with AI fields
             await prisma.payment.update({
               where: { id: payment.id },
-              data: { status: "APPROVED", verifiedAt: new Date() },
-            });
-
-            // Mark tokens as used and link to payment
+              data: {
+                status: "APPROVED",
+                verifiedAt: new Date(),
+                aiVerified: true,
+                aiAutoApproved: true,
+                aiConfident: verification.confident,
+                aiExtractedAmount: verification.extractedAmount,
+                aiExtractedRef: verification.extractedReference,
+                aiExtractedDate: verification.extractedDate,
+                aiAmountMatch: verification.amountMatch,
+                aiReferenceMatch: verification.referenceMatch,
+                aiDateMatch: verification.dateMatch,
+                aiReasoning: verification.reasoning,
             await prisma.token.updateMany({
               where: { id: { in: availableTokens.map((t) => t.id) } },
               data: { status: "USED", paymentId: payment.id },
@@ -154,7 +163,22 @@ export async function POST(request: Request) {
             });
           }
         } else {
-          // AI could not auto-approve — send to manual review with AI notes
+          // AI could not auto-approve — save results and send to manual review
+          await prisma.payment.update({
+            where: { id: payment.id },
+            data: {
+              aiVerified: true,
+              aiAutoApproved: false,
+              aiConfident: verification.confident,
+              aiExtractedAmount: verification.extractedAmount,
+              aiExtractedRef: verification.extractedReference,
+              aiExtractedDate: verification.extractedDate,
+              aiAmountMatch: verification.amountMatch,
+              aiReferenceMatch: verification.referenceMatch,
+              aiDateMatch: verification.dateMatch,
+              aiReasoning: verification.reasoning,
+            },
+          });
           await notifyAdmins({
             title: "🔍 Payment Needs Manual Review",
             message: `${user?.name} submitted R${expectedAmount.toLocaleString()} for meter ${meterInfo?.meterNumber}. AI verdict: ${verification.reasoning} (Amount: ${verification.amountMatch ? "✓" : "✗"}, Date: ${verification.dateMatch ? "✓" : verification.dateMatch === null ? "?" : "✗"}, Ref: ${verification.referenceMatch ? "✓" : verification.referenceMatch === null ? "N/A" : "✗"})`,

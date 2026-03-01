@@ -21,6 +21,16 @@ interface Payment {
   meter: { meterNumber: string };
   tokens: { id: string; tokenValue: string }[];
   proofSignedUrl?: string;
+  aiVerified?: boolean;
+  aiAutoApproved?: boolean;
+  aiConfident?: boolean;
+  aiExtractedAmount?: number | null;
+  aiExtractedRef?: string | null;
+  aiExtractedDate?: string | null;
+  aiAmountMatch?: boolean | null;
+  aiReferenceMatch?: boolean | null;
+  aiDateMatch?: boolean | null;
+  aiReasoning?: string | null;
 }
 
 export default function PaymentsPage() {
@@ -318,6 +328,70 @@ export default function PaymentsPage() {
                 )}
               </div>
 
+              {/* AI Verification Panel */}
+              {selectedPayment.aiVerified && (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <div className={`px-4 py-3 flex items-center justify-between ${
+                    selectedPayment.aiAutoApproved ? "bg-green-50" :
+                    selectedPayment.aiConfident === false ? "bg-red-50" : "bg-yellow-50"
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">🤖</span>
+                      <span className="font-semibold text-sm text-gray-900">AI Verification</span>
+                    </div>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                      selectedPayment.aiAutoApproved ? "bg-green-100 text-green-700" :
+                      selectedPayment.aiConfident === false ? "bg-red-100 text-red-700" :
+                      "bg-yellow-100 text-yellow-700"
+                    }`}>
+                      {selectedPayment.aiAutoApproved ? "Auto-Approved" :
+                       selectedPayment.aiConfident === false ? "Low Confidence" : "Needs Review"}
+                    </span>
+                  </div>
+                  <div className="p-4 space-y-3">
+                    {/* Extracted values */}
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="text-center p-2 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-400 mb-1">Extracted Amount</p>
+                        <p className="font-semibold text-sm text-gray-900">
+                          {selectedPayment.aiExtractedAmount != null
+                            ? `R${selectedPayment.aiExtractedAmount.toLocaleString()}`
+                            : <span className="text-gray-400">—</span>}
+                        </p>
+                        <MatchBadge value={selectedPayment.aiAmountMatch} />
+                      </div>
+                      <div className="text-center p-2 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-400 mb-1">Extracted Date</p>
+                        <p className="font-semibold text-sm text-gray-900">
+                          {selectedPayment.aiExtractedDate ?? <span className="text-gray-400">—</span>}
+                        </p>
+                        <MatchBadge value={selectedPayment.aiDateMatch} label="In Range" />
+                      </div>
+                      <div className="text-center p-2 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-400 mb-1">Extracted Ref</p>
+                        <p className="font-semibold text-sm text-gray-900 truncate">
+                          {selectedPayment.aiExtractedRef ?? <span className="text-gray-400">—</span>}
+                        </p>
+                        <MatchBadge value={selectedPayment.aiReferenceMatch} />
+                      </div>
+                    </div>
+                    {/* Expected vs extracted */}
+                    <div className="text-xs text-gray-500 bg-gray-50 rounded-lg p-3 space-y-1">
+                      <p><span className="font-medium">Expected amount:</span> R{selectedPayment.totalAmount.toLocaleString()}</p>
+                      {selectedPayment.referenceNumber && (
+                        <p><span className="font-medium">Expected ref:</span> {selectedPayment.referenceNumber}</p>
+                      )}
+                    </div>
+                    {/* AI reasoning */}
+                    {selectedPayment.aiReasoning && (
+                      <p className="text-xs text-gray-600 italic border-l-2 border-gray-200 pl-3">
+                        "{selectedPayment.aiReasoning}"
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Status & Actions */}
               <div className="border-t border-gray-100 pt-4">
                 <div className="flex items-center gap-2 mb-4">
@@ -409,4 +483,10 @@ export default function PaymentsPage() {
       </AnimatePresence>
     </div>
   );
+}
+
+function MatchBadge({ value, label = "Match" }: { value: boolean | null | undefined; label?: string }) {
+  if (value === true) return <span className="text-xs text-green-600 font-medium">✓ {label}</span>;
+  if (value === false) return <span className="text-xs text-red-600 font-medium">✗ No {label}</span>;
+  return <span className="text-xs text-gray-400">— N/A</span>;
 }
