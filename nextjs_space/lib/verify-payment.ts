@@ -84,21 +84,26 @@ Respond ONLY with a JSON object in this exact format, no other text:
         let publicId = imageUrl.slice(uploadIndex + 8).replace(/^v\d+\//, "");
         console.log("PDF public_id:", publicId);
 
-        // Generate a short-lived signed download URL using Cloudinary utils
-        const signedUrl = cloudinary.utils.private_download_url(publicId, "pdf", {
-          resource_type: "raw",
-          expires_at: Math.floor(Date.now() / 1000) + 120,
-          attachment: false,
-        });
-
-        console.log("Signed URL:", signedUrl.slice(0, 120));
-
-        const pdfResponse = await fetch(signedUrl);
-        if (!pdfResponse.ok) {
-          throw new Error(`Signed URL fetch failed: ${pdfResponse.status}`);
+        // Try both resource types - Cloudinary may store PDF under image or raw
+        let pdfBuffer: ArrayBuffer | null = null;
+        for (const resourceType of ["image", "raw"] as const) {
+          const signedUrl = cloudinary.utils.private_download_url(publicId, "pdf", {
+            resource_type: resourceType,
+            expires_at: Math.floor(Date.now() / 1000) + 120,
+            attachment: false,
+          });
+          console.log(`Trying resource_type=${resourceType}, url:`, signedUrl.slice(0, 120));
+          const res = await fetch(signedUrl);
+          console.log(`Status: ${res.status}, content-type: ${res.headers.get("content-type")}`);
+          if (res.ok) {
+            pdfBuffer = await res.arrayBuffer();
+            break;
+          }
         }
 
-        const pdfBuffer = await pdfResponse.arrayBuffer();
+        if (!pdfBuffer) {
+          throw new Error(`Signed URL fetch failed for both resource types`);
+        }
         const base64 = Buffer.from(pdfBuffer).toString("base64");
         contentBlock = {
           type: "document",
