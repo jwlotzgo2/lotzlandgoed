@@ -58,11 +58,19 @@ Respond ONLY with a JSON object in this exact format, no other text:
   "reasoning": "<one clear sentence explaining your decision>"
 }`;
 
-    console.log("verify-payment: isPdf =", isPdf, "imageUrl =", imageUrl.slice(0, 80));
+    // Detect PDF: use passed flag OR sniff from URL/content-type
+    const urlLower = imageUrl.toLowerCase();
+    const looksLikePdf = isPdf 
+      || urlLower.includes(".pdf")
+      || urlLower.includes("application/pdf")
+      // Cloudinary PDFs stored as raw: no image extension at end of path
+      || (urlLower.includes("cloudinary.com") && !/\.(jpg|jpeg|png|gif|webp|svg)(\?|$)/.test(urlLower));
+
+    console.log("verify-payment: isPdf =", isPdf, "looksLikePdf =", looksLikePdf, "url =", imageUrl.slice(0, 80));
 
     // For PDFs, fetch and convert to base64 for Claude's document API
     let contentBlock: any;
-    if (isPdf) {
+    if (looksLikePdf) {
       try {
         // Try fetching the PDF - add format hint for Cloudinary
         const fetchUrl = imageUrl.includes("cloudinary.com") && !imageUrl.includes(".pdf")
