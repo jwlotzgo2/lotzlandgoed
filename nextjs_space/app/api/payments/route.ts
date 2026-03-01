@@ -91,6 +91,26 @@ export async function POST(request: Request) {
     const imageUrl = aiScanUrl || proofUrl || null;
     console.log("payments POST: fileBase64 length =", fileBase64?.length ?? 0, "fileMimeType =", fileMimeType, "imageUrl =", imageUrl?.slice(0, 80));
 
+    // If it's a PDF URL, fetch it server-side and convert to base64 here
+    let resolvedBase64 = fileBase64 || "";
+    let resolvedMimeType = fileMimeType || "";
+    if (!resolvedBase64 && imageUrl && imageUrl.toLowerCase().includes(".pdf")) {
+      try {
+        console.log("Fetching PDF server-side from:", imageUrl);
+        const pdfRes = await fetch(imageUrl);
+        if (pdfRes.ok) {
+          const buf = await pdfRes.arrayBuffer();
+          resolvedBase64 = Buffer.from(buf).toString("base64");
+          resolvedMimeType = "application/pdf";
+          console.log("PDF fetched server-side, base64 length:", resolvedBase64.length);
+        } else {
+          console.log("Server-side PDF fetch failed:", pdfRes.status);
+        }
+      } catch (e) {
+        console.log("Server-side PDF fetch error:", e);
+      }
+    }
+
     // Run AI verification if we have an image
     if (imageUrl) {
       try {
@@ -99,8 +119,8 @@ export async function POST(request: Request) {
           expectedAmount,
           expectedReference: referenceNumber,
           expectedDate: paymentDate,
-          fileBase64,
-          fileMimeType,
+          fileBase64: resolvedBase64,
+          fileMimeType: resolvedMimeType,
         });
 
         console.log("AI verification result:", verification);
