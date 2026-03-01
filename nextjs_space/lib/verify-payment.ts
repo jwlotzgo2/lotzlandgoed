@@ -15,11 +15,13 @@ export async function verifyProofOfPayment({
   expectedAmount,
   expectedReference,
   expectedDate,
+  isPdf = false,
 }: {
   imageUrl: string;
   expectedAmount: number;
   expectedReference?: string | null;
   expectedDate?: string | null;
+  isPdf?: boolean;
 }): Promise<VerificationResult> {
   try {
     const today = new Date().toISOString().split("T")[0];
@@ -56,18 +58,20 @@ Respond ONLY with a JSON object in this exact format, no other text:
   "reasoning": "<one clear sentence explaining your decision>"
 }`;
 
-    const isPdf = imageUrl.toLowerCase().includes(".pdf") || imageUrl.toLowerCase().includes("/pdf");
-
     // For PDFs, fetch and convert to base64 for Claude's document API
     let contentBlock: any;
     if (isPdf) {
-      const pdfResponse = await fetch(imageUrl);
-      const pdfBuffer = await pdfResponse.arrayBuffer();
-      const base64 = Buffer.from(pdfBuffer).toString("base64");
-      contentBlock = {
-        type: "document",
-        source: { type: "base64", media_type: "application/pdf", data: base64 },
-      };
+      try {
+        const pdfResponse = await fetch(imageUrl);
+        const pdfBuffer = await pdfResponse.arrayBuffer();
+        const base64 = Buffer.from(pdfBuffer).toString("base64");
+        contentBlock = {
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: base64 },
+        };
+      } catch {
+        return failResult("Could not fetch PDF for verification");
+      }
     } else {
       contentBlock = {
         type: "image",

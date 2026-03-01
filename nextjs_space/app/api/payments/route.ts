@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     }
 
     const userId = (session.user as any)?.id;
-    const { meterId, quantity, proofUrl, cloudStoragePath, referenceNumber, paymentDate } =
+    const { meterId, quantity, proofUrl, cloudStoragePath, referenceNumber, paymentDate, proofIsPdf } =
       await request.json();
 
     if (!meterId || !quantity || quantity < 1) {
@@ -102,6 +102,7 @@ export async function POST(request: Request) {
           expectedAmount,
           expectedReference: referenceNumber,
           expectedDate: paymentDate,
+          isPdf: proofIsPdf ?? false,
         });
 
         console.log("AI verification result:", verification);
