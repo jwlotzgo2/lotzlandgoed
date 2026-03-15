@@ -84,6 +84,9 @@ export default function AdminDashboard() {
 
   const filteredTotal = filteredMonthly.reduce((s, m) => s + m.count, 0);
   const filteredRevenue = filteredMonthly.reduce((s, m) => s + m.amount, 0);
+  const nonZeroMonths = filteredMonthly.filter(m => m.count > 0).length || 1;
+  const avgMonthlyRevenue = filteredRevenue / nonZeroMonths;
+  const avgMonthlyTokens  = filteredTotal  / nonZeroMonths;
 
   return (
     <div className="space-y-6">
@@ -162,10 +165,12 @@ export default function AdminDashboard() {
         <div className="card py-3">
           <p className="text-xl font-bold text-gray-900">{filteredTotal}</p>
           <p className="text-xs text-gray-500 mt-0.5">Tokens purchased</p>
+          <p className="text-xs text-gray-400 mt-0.5">{avgMonthlyTokens.toFixed(1)}/mo avg</p>
         </div>
         <div className="card py-3">
           <p className="text-xl font-bold text-[#1e5631]">R{(filteredRevenue / 1000).toFixed(1)}k</p>
           <p className="text-xs text-gray-500 mt-0.5">Revenue</p>
+          <p className="text-xs text-gray-400 mt-0.5">R{Math.round(avgMonthlyRevenue / 1000)}k/mo avg</p>
         </div>
       </div>
 
@@ -228,7 +233,7 @@ export default function AdminDashboard() {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="card">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-base font-semibold text-gray-900">Token Inventory</h2>
-          <Link href="/admin/users" className="text-sm text-[#1e5631] hover:underline">Manage users →</Link>
+          <Link href="/admin/tokens" className="text-sm text-[#1e5631] hover:underline">Manage sheets →</Link>
         </div>
         {meterStats.length === 0 ? (
           <p className="text-gray-400 text-center py-8">No meters found</p>
@@ -237,11 +242,20 @@ export default function AdminDashboard() {
             {meterStats.map((meter, i) => {
               const pct = meter.totalTokens > 0 ? (meter.availableTokens / meter.totalTokens) * 100 : 0;
               const barColor = meter.availableTokens === 0 ? "bg-red-500" : meter.availableTokens <= 2 ? "bg-orange-400" : "bg-green-500";
+              // Find consumption data for this meter to predict depletion
+              const meterConsumption = consumption?.byMeter?.find(m => m.meterId === meter.meterId);
+              const avgDays = meterConsumption?.avgDaysBetween;
+              // Depletion prediction: available tokens × avg days between purchases
+              const daysUntilEmpty = avgDays && meter.availableTokens > 0
+                ? Math.round(meter.availableTokens * avgDays)
+                : null;
+              const needsRestock = meter.availableTokens <= 3;
+              const criticalRestock = meter.availableTokens === 0;
               return (
                 <motion.div key={meter.meterId} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.1 + i * 0.04 }}
-                  className="flex items-center gap-4 p-3 bg-gray-50 rounded-xl">
-                  <div className="w-9 h-9 bg-[#1e5631] rounded-lg flex items-center justify-center flex-shrink-0">
+                  className={`flex items-center gap-4 p-3 rounded-xl ${criticalRestock ? "bg-red-50 border border-red-200" : needsRestock ? "bg-orange-50 border border-orange-200" : "bg-gray-50"}`}>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${criticalRestock ? "bg-red-500" : needsRestock ? "bg-orange-400" : "bg-[#1e5631]"}`}>
                     <Gauge className="w-4 h-4 text-white" />
                   </div>
                   <div className="flex-1 min-w-0">
@@ -252,16 +266,27 @@ export default function AdminDashboard() {
                       </div>
                       <div className="text-right flex-shrink-0 ml-3">
                         <p className="text-sm font-bold text-gray-900">
-                          <span className="text-green-600">{meter.availableTokens}</span>
+                          <span className={criticalRestock ? "text-red-600" : needsRestock ? "text-orange-500" : "text-green-600"}>{meter.availableTokens}</span>
                           <span className="text-gray-400 font-normal"> / {meter.totalTokens}</span>
                         </p>
-                        <p className="text-xs text-gray-400">{meter.usedTokens} used</p>
+                        {daysUntilEmpty !== null ? (
+                          <p className={`text-xs font-medium ${daysUntilEmpty <= 30 ? "text-red-500" : daysUntilEmpty <= 60 ? "text-orange-500" : "text-gray-400"}`}>
+                            ~{daysUntilEmpty}d stock left
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-400">{meter.usedTokens} used</p>
+                        )}
                       </div>
                     </div>
                     {meter.totalTokens > 0 && (
                       <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                         <div className={`h-full rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
                       </div>
+                    )}
+                    {needsRestock && (
+                      <p className={`text-xs font-medium mt-1.5 ${criticalRestock ? "text-red-600" : "text-orange-600"}`}>
+                        {criticalRestock ? "⚠ Out of tokens — upload new sheet now" : "⚠ Low stock — consider uploading new tokens"}
+                      </p>
                     )}
                   </div>
                 </motion.div>

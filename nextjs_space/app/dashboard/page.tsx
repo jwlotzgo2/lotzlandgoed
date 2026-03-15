@@ -111,6 +111,11 @@ export default function UserDashboard() {
   const totalTokens = approved.reduce((s, p) => s + (p.quantity ?? 0), 0);
   const recentPayments = payments.slice(0, 5);
 
+  // Avg monthly — count non-zero months in filtered period
+  const nonZeroMonths = filteredMonthly.filter(m => m.count > 0).length || 1;
+  const avgMonthlySpend  = totalSpent / nonZeroMonths;
+  const avgMonthlyTokens = totalTokens / nonZeroMonths;
+
   const statusIcon = (s: string) => {
     if (s === "APPROVED") return <CheckCircle className="w-4 h-4 text-green-500" />;
     if (s === "REJECTED") return <XCircle className="w-4 h-4 text-red-500" />;
@@ -166,18 +171,41 @@ export default function UserDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
-        {[
-          { label: "Spent",    value: `R${totalSpent >= 1000 ? `${Math.round(totalSpent/1000)}k` : totalSpent}`, icon: <TrendingUp className="w-4 h-4 text-[#1e5631]" />, bg: "bg-green-50" },
-          { label: "Tokens",   value: totalTokens,                      icon: <Zap className="w-4 h-4 text-blue-500" />,        bg: "bg-blue-50" },
-          { label: "Pending",  value: pending.length || "—",             icon: <Clock className="w-4 h-4 text-yellow-500" />,    bg: "bg-yellow-50" },
-        ].map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.06 }} className="card py-3 px-3">
-            <div className={`w-7 h-7 ${s.bg} rounded-lg flex items-center justify-center mb-2`}>{s.icon}</div>
-            <p className="text-lg font-bold text-gray-900 leading-none">{s.value}</p>
-            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
-          </motion.div>
-        ))}
+        {/* Spent card */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0 }} className="card py-3 px-3">
+          <div className="w-7 h-7 bg-green-50 rounded-lg flex items-center justify-center mb-2">
+            <TrendingUp className="w-4 h-4 text-[#1e5631]" />
+          </div>
+          <p className="text-lg font-bold text-gray-900 leading-none">
+            R{totalSpent >= 1000 ? `${Math.round(totalSpent/1000)}k` : totalSpent}
+          </p>
+          <p className="text-xs text-gray-500 mt-1">Spent</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            R{avgMonthlySpend >= 1000 ? `${Math.round(avgMonthlySpend/1000)}k` : Math.round(avgMonthlySpend)}/mo avg
+          </p>
+        </motion.div>
+        {/* Tokens card */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.06 }} className="card py-3 px-3">
+          <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center mb-2">
+            <Zap className="w-4 h-4 text-blue-500" />
+          </div>
+          <p className="text-lg font-bold text-gray-900 leading-none">{totalTokens}</p>
+          <p className="text-xs text-gray-500 mt-1">Tokens</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {avgMonthlyTokens >= 1 ? avgMonthlyTokens.toFixed(1) : "<1"}/mo avg
+          </p>
+        </motion.div>
+        {/* Pending card */}
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }} className="card py-3 px-3">
+          <div className="w-7 h-7 bg-yellow-50 rounded-lg flex items-center justify-center mb-2">
+            <Clock className="w-4 h-4 text-yellow-500" />
+          </div>
+          <p className="text-lg font-bold text-gray-900 leading-none">{pending.length || "—"}</p>
+          <p className="text-xs text-gray-500 mt-1">Pending</p>
+          <p className="text-xs text-gray-400 mt-0.5">
+            {rejected.length > 0 ? `${rejected.length} rejected` : "none rejected"}
+          </p>
+        </motion.div>
       </div>
 
       {/* Meter Status */}
