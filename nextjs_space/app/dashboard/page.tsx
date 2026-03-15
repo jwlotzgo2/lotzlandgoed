@@ -1,4 +1,4 @@
-"use client"; // build: 20260315_192809
+"use client"; // build: 20260315_193108
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useMemo } from "react";
@@ -191,7 +191,7 @@ export default function UserDashboard() {
           </p>
           <p className="text-xs text-gray-500 mt-1">Spent</p>
           <p className="text-xs text-gray-400 mt-0.5">
-            R{avgMonthlySpend >= 1000 ? `${Math.round(avgMonthlySpend/1000)}k` : Math.round(avgMonthlySpend)}/mo avg
+            R{avgMonthlySpend >= 1000 ? `${(avgMonthlySpend/1000).toFixed(1)}k` : Math.round(avgMonthlySpend)}/mo avg
           </p>
         </motion.div>
         {/* Tokens card */}
