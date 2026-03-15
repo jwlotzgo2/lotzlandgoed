@@ -16,6 +16,7 @@ interface MeterData {
 }
 interface ConsumptionData {
   monthly: MonthData[]; byMeter: MeterData[];
+  events: any[];
   trend: "up" | "down" | "neutral"; trendPct: number;
   currentSeason: string; totalTokens: number; totalSpend: number;
 }
@@ -43,6 +44,7 @@ export default function AdminConsumptionPage() {
   const [data, setData] = useState<ConsumptionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterKey>("this-year");
+  const [selectedMeter, setSelectedMeter] = useState<string>("all");
 
   useEffect(() => {
     fetch("/api/consumption").then(r => r.json()).then(d => setData(d)).catch(console.error).finally(() => setLoading(false));
@@ -51,6 +53,8 @@ export default function AdminConsumptionPage() {
   const filtered = useMemo(() => {
     if (!data) return [];
     const now = new Date(); const cy = now.getFullYear();
+    // If a specific meter is selected, rebuild monthly from events
+    // Otherwise use aggregate monthly
     return data.monthly.filter(m => {
       const [y, mo] = m.monthKey.split("-").map(Number);
       const mDate = new Date(y, mo - 1, 1);
@@ -61,19 +65,36 @@ export default function AdminConsumptionPage() {
     });
   }, [data, filter]);
 
+  // Per-meter monthly data (derived from events)
+  const filteredByMeter = useMemo(() => {
+    if (!data?.events || selectedMeter === "all") return filtered;
+    const now = new Date(); const cy = now.getFullYear();
+    const meterEvents = data.events.filter((e: any) => e.meterId === selectedMeter);
+    // Rebuild monthly counts from events
+    return filtered.map(m => {
+      const count = meterEvents.filter((e: any) => {
+        const d = new Date(e.date);
+        const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+        return key === m.monthKey;
+      }).length;
+      return { ...m, count, amount: count * 1600 };
+    });
+  }, [filtered, selectedMeter, data]);
+
   if (loading) return <Loading text="Loading consumption data..." />;
   if (!data)   return <div className="card text-center py-12 text-gray-500">No data available</div>;
 
   const { byMeter, trend, trendPct, currentSeason, totalTokens, totalSpend } = data;
-  const maxCount = Math.max(...filtered.map(m => m.count), 1);
-  const filteredTotal  = filtered.reduce((s, m) => s + m.count, 0);
-  const filteredSpend  = filtered.reduce((s, m) => s + m.amount, 0);
+  const chartData = filteredByMeter;
+  const maxCount = Math.max(...chartData.map(m => m.count), 1);
+  const filteredTotal  = chartData.reduce((s, m) => s + m.count, 0);
+  const filteredSpend  = chartData.reduce((s, m) => s + m.amount, 0);
 
   const seasonTotals: Record<string, { count: number; months: number }> = {
     Summer: { count: 0, months: 0 }, Autumn: { count: 0, months: 0 },
     Winter: { count: 0, months: 0 }, Spring: { count: 0, months: 0 },
   };
-  filtered.forEach(m => { seasonTotals[m.season].count += m.count; if (m.count > 0) seasonTotals[m.season].months++; });
+  chartData.forEach(m => { seasonTotals[m.season].count += m.count; if (m.count > 0) seasonTotals[m.season].months++; });
   const maxSeasonAvg = Math.max(...Object.values(seasonTotals).map(s => s.months > 0 ? s.count / s.months : 0), 1);
 
   return (
@@ -157,10 +178,33 @@ export default function AdminConsumptionPage() {
         </div>
       </div>
 
+      {/* Meter filter pills */}
+      <div>
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Filter by meter</p>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          <button onClick={() => setSelectedMeter("all")}
+            className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+              selectedMeter === "all" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}>
+            All meters
+          </button>
+          {byMeter.map(m => (
+            <button key={m.meterId} onClick={() => setSelectedMeter(m.meterId)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+                selectedMeter === m.meterId ? "bg-[#1e5631] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}>
+              {m.userName} <span className="opacity-60 text-xs ml-1">{m.meterNumber.slice(-4)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Bar chart */}
       <div className="card">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-base font-semibold text-gray-900">Monthly Purchases — All Meters</h2>
+          <h2 className="text-base font-semibold text-gray-900">
+            {selectedMeter === "all" ? "Monthly Purchases — All Meters" : `Monthly Purchases — ${byMeter.find(m => m.meterId === selectedMeter)?.userName ?? ""}`}
+          </h2>
           <div className="flex gap-2 flex-wrap justify-end">
             {Object.entries(seasonBarColor).map(([s, c]) => (
               <div key={s} className="flex items-center gap-1">
@@ -174,7 +218,7 @@ export default function AdminConsumptionPage() {
           <div className="flex items-center justify-center h-32 text-gray-400 text-sm">No purchases in this period</div>
         ) : (
           <div className="flex items-end gap-1" style={{ height: `${CHART_H + 36}px` }}>
-            {filtered.map(m => {
+            {chartData.map(m => {
               const barH = m.count > 0 ? Math.max(6, Math.round((m.count / maxCount) * CHART_H)) : 4;
               return (
                 <div key={m.monthKey} className="flex-1 flex flex-col items-center justify-end"
