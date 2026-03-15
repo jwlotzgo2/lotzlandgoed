@@ -21,12 +21,14 @@ export function Header() {
         { href: "/admin/tokens", label: "Tokens" },
         { href: "/admin/users", label: "Users" },
         { href: "/admin/activity", label: "Journal" },
+        { href: "/admin/consumption", label: "Consumption" },
       ]
     : [
         { href: "/dashboard", label: "Home" },
         { href: "/dashboard/buy", label: "Buy Tokens" },
         { href: "/dashboard/history", label: "History" },
         { href: "/dashboard/activity", label: "Activity" },
+        { href: "/dashboard/consumption", label: "Consumption" },
       ];
 
   return (
