@@ -1,8 +1,8 @@
 "use client";
 
 import { useSession } from "next-auth/react";
-import { useEffect, useState } from "react";
-import { Zap, CreditCard, Clock, ChevronRight, TrendingUp, CheckCircle, XCircle, AlertTriangle, Activity, AlertCircle } from "lucide-react";
+import { useEffect, useState, useMemo } from "react";
+import { Zap, CreditCard, Clock, ChevronRight, TrendingUp, CheckCircle, XCircle, AlertTriangle, Activity } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Loading } from "@/components/ui/loading";
@@ -16,19 +16,34 @@ interface Payment {
   createdAt: string;
   aiAutoApproved?: boolean;
   meter: { meterNumber: string };
-  tokens: { id: string; tokenValue: string; status: string }[];
 }
 
 interface MeterData {
   meterId: string;
   meterNumber: string;
+  userName: string;
   totalTokens: number;
   daysSinceLast: number | null;
   avgDaysBetween: number | null;
   predictedNextDays: number | null;
   urgency: "ok" | "soon" | "overdue" | "unknown";
-  lastPurchase: string | null;
 }
+
+interface MonthData {
+  monthKey: string;
+  year: number;
+  count: number;
+  amount: number;
+}
+
+type FilterKey = "this-year" | "last-6" | "last-year" | "all";
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "this-year", label: "This year" },
+  { key: "last-6",    label: "Last 6 months" },
+  { key: "last-year", label: "Last year" },
+  { key: "all",       label: "All time" },
+];
 
 const urgencyConfig = {
   ok:      { color: "text-green-600",  bg: "bg-green-50",  border: "#86efac", icon: CheckCircle,   label: "On track" },
@@ -40,8 +55,9 @@ const urgencyConfig = {
 export default function UserDashboard() {
   const { data: session } = useSession() || {};
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [consumption, setConsumption] = useState<{ byMeter: MeterData[] } | null>(null);
+  const [consumption, setConsumption] = useState<{ byMeter: MeterData[]; monthly: MonthData[] } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<FilterKey>("this-year");
   const user = session?.user as any;
 
   useEffect(() => {
@@ -54,11 +70,44 @@ export default function UserDashboard() {
     }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
+  const filteredMonthly = useMemo(() => {
+    if (!consumption?.monthly) return [];
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    return consumption.monthly.filter(m => {
+      const [year, month] = m.monthKey.split("-").map(Number);
+      const mDate = new Date(year, month - 1, 1);
+      if (filter === "this-year")  return year === currentYear;
+      if (filter === "last-year")  return year === currentYear - 1;
+      if (filter === "last-6") {
+        const cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        return mDate >= cutoff;
+      }
+      return true; // all
+    });
+  }, [consumption, filter]);
+
+  const filteredPayments = useMemo(() => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    return payments.filter(p => {
+      const d = new Date(p.createdAt);
+      if (filter === "this-year")  return d.getFullYear() === currentYear;
+      if (filter === "last-year")  return d.getFullYear() === currentYear - 1;
+      if (filter === "last-6") {
+        const cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        return d >= cutoff;
+      }
+      return true;
+    });
+  }, [payments, filter]);
+
   if (loading) return <Loading text="Loading dashboard..." />;
 
-  const approved = payments.filter(p => p.status === "APPROVED");
-  const pending = payments.filter(p => p.status === "PENDING");
-  const totalSpent = approved.reduce((s, p) => s + (p.totalAmount ?? 0), 0);
+  const approved  = filteredPayments.filter(p => p.status === "APPROVED");
+  const pending   = filteredPayments.filter(p => p.status === "PENDING");
+  const rejected  = filteredPayments.filter(p => p.status === "REJECTED");
+  const totalSpent  = approved.reduce((s, p) => s + (p.totalAmount ?? 0), 0);
   const totalTokens = approved.reduce((s, p) => s + (p.quantity ?? 0), 0);
   const recentPayments = payments.slice(0, 5);
 
@@ -67,7 +116,6 @@ export default function UserDashboard() {
     if (s === "REJECTED") return <XCircle className="w-4 h-4 text-red-500" />;
     return <Clock className="w-4 h-4 text-yellow-500" />;
   };
-
   const statusColor = (s: string) => {
     if (s === "APPROVED") return "text-green-600 bg-green-50";
     if (s === "REJECTED") return "text-red-600 bg-red-50";
@@ -104,12 +152,24 @@ export default function UserDashboard() {
         </motion.div>
       </Link>
 
+      {/* Filter pills */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {FILTERS.map(f => (
+          <button key={f.key} onClick={() => setFilter(f.key)}
+            className={`px-4 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+              filter === f.key ? "bg-[#1e5631] text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+            }`}>
+            {f.label}
+          </button>
+        ))}
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Total Spent",   value: `R${Math.round(totalSpent / 1000)}k`, icon: <TrendingUp className="w-4 h-4 text-[#1e5631]" />, bg: "bg-green-50" },
-          { label: "Tokens",        value: totalTokens,                           icon: <Zap className="w-4 h-4 text-blue-500" />,        bg: "bg-blue-50" },
-          { label: "Pending",       value: pending.length || "—",                 icon: <Clock className="w-4 h-4 text-yellow-500" />,    bg: "bg-yellow-50" },
+          { label: "Spent",    value: `R${totalSpent >= 1000 ? `${Math.round(totalSpent/1000)}k` : totalSpent}`, icon: <TrendingUp className="w-4 h-4 text-[#1e5631]" />, bg: "bg-green-50" },
+          { label: "Tokens",   value: totalTokens,                      icon: <Zap className="w-4 h-4 text-blue-500" />,        bg: "bg-blue-50" },
+          { label: "Pending",  value: pending.length || "—",             icon: <Clock className="w-4 h-4 text-yellow-500" />,    bg: "bg-yellow-50" },
         ].map((s, i) => (
           <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.06 }} className="card py-3 px-3">
@@ -120,7 +180,7 @@ export default function UserDashboard() {
         ))}
       </div>
 
-      {/* Meter Status (from consumption API) */}
+      {/* Meter Status */}
       {consumption?.byMeter && consumption.byMeter.length > 0 && (
         <div>
           <div className="flex items-center justify-between mb-3">
@@ -143,6 +203,7 @@ export default function UserDashboard() {
                       <Icon className={`w-5 h-5 ${cfg.color} flex-shrink-0`} />
                       <div>
                         <p className="font-semibold text-gray-900 text-sm">Meter {m.meterNumber}</p>
+                        <p className="text-xs text-gray-500">{m.userName}</p>
                         <p className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</p>
                       </div>
                     </div>
@@ -152,9 +213,7 @@ export default function UserDashboard() {
                           <p className={`text-lg font-bold leading-none ${cfg.color}`}>
                             {m.predictedNextDays === 0 ? "Today" : `${m.predictedNextDays}d`}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {m.predictedNextDays === 0 ? "Top up now" : "next top-up"}
-                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">next top-up</p>
                         </>
                       ) : (
                         <p className="text-xs text-gray-400">Insufficient data</p>
@@ -178,7 +237,7 @@ export default function UserDashboard() {
                   {m.avgDaysBetween && m.daysSinceLast !== null && (
                     <div className="mt-3">
                       <div className="h-1.5 bg-black/10 rounded-full overflow-hidden">
-                        <div className={`h-full rounded-full transition-all ${
+                        <div className={`h-full rounded-full ${
                           m.urgency === "overdue" ? "bg-red-400" :
                           m.urgency === "soon" ? "bg-amber-400" : "bg-green-400"
                         }`} style={{ width: `${Math.min(100, Math.round((m.daysSinceLast / m.avgDaysBetween) * 100))}%` }} />
@@ -192,20 +251,18 @@ export default function UserDashboard() {
         </div>
       )}
 
-      {/* Recent Payments + Summary side by side */}
+      {/* Payment Summary + Recent */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Summary */}
         <div className="card">
           <h2 className="text-sm font-semibold text-gray-900 mb-3">Payment Summary</h2>
-          {payments.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-4">No payments yet</p>
+          {filteredPayments.length === 0 ? (
+            <p className="text-gray-400 text-sm text-center py-4">No payments in this period</p>
           ) : (
             <div className="space-y-2">
               {[
-                { label: "Approved", count: approved.length, amount: totalSpent,                                              color: "bg-green-500" },
-                { label: "Pending",  count: pending.length,  amount: pending.reduce((s, p) => s + p.totalAmount, 0),          color: "bg-yellow-400" },
-                { label: "Rejected", count: payments.filter(p => p.status === "REJECTED").length,
-                  amount: payments.filter(p => p.status === "REJECTED").reduce((s, p) => s + p.totalAmount, 0), color: "bg-red-400" },
+                { label: "Approved", count: approved.length,  amount: totalSpent,                                              color: "bg-green-500" },
+                { label: "Pending",  count: pending.length,   amount: pending.reduce((s, p) => s + p.totalAmount, 0),          color: "bg-yellow-400" },
+                { label: "Rejected", count: rejected.length,  amount: rejected.reduce((s, p) => s + p.totalAmount, 0),         color: "bg-red-400" },
               ].map(row => (
                 <div key={row.label} className="flex items-center gap-2 text-sm">
                   <div className={`w-2 h-2 rounded-full flex-shrink-0 ${row.color}`} />
@@ -216,13 +273,11 @@ export default function UserDashboard() {
               ))}
               <div className="border-t pt-2 flex justify-between text-sm">
                 <span className="font-medium text-gray-700">Total</span>
-                <span className="font-bold text-gray-900">R{payments.reduce((s, p) => s + p.totalAmount, 0).toLocaleString()}</span>
+                <span className="font-bold text-gray-900">R{filteredPayments.reduce((s, p) => s + p.totalAmount, 0).toLocaleString()}</span>
               </div>
             </div>
           )}
         </div>
-
-        {/* Recent */}
         <div className="card">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-sm font-semibold text-gray-900">Recent Payments</h2>
@@ -244,7 +299,7 @@ export default function UserDashboard() {
                   <div className="text-right">
                     <p className="text-xs font-semibold text-gray-900">R{p.totalAmount?.toLocaleString()}</p>
                     <span className={`text-xs px-1.5 py-0.5 rounded-full ${statusColor(p.status)}`}>
-                      {p.aiAutoApproved ? "🤖 " : ""}{p.status}
+                      {(p as any).aiAutoApproved ? "🤖 " : ""}{p.status}
                     </span>
                   </div>
                 </div>
