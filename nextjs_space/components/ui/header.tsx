@@ -3,7 +3,7 @@
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Zap, LogOut, Menu, X } from "lucide-react";
+import { Zap, LogOut, Menu, X, Download } from "lucide-react";
 import { useState } from "react";
 import { NotificationBell } from "@/components/ui/notification-bell";
 
@@ -50,9 +50,17 @@ export function Header() {
             ))}
           </nav>
 
-          {/* Desktop user menu */}
+          {/* Desktop right */}
           <div className="hidden md:flex items-center gap-3">
             <NotificationBell />
+            <Link
+              href="/install"
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#1e5631] transition-colors px-2 py-1 rounded-md hover:bg-green-50"
+              title="Install app"
+            >
+              <Download className="w-4 h-4" />
+              Install
+            </Link>
             <span className="text-sm text-gray-600">{user?.name}</span>
             <button
               onClick={() => signOut({ callbackUrl: "/login" })}
@@ -63,7 +71,7 @@ export function Header() {
             </button>
           </div>
 
-          {/* Mobile hamburger */}
+          {/* Mobile right */}
           <div className="flex items-center gap-2 md:hidden">
             <NotificationBell />
             <button
@@ -93,6 +101,15 @@ export function Header() {
               {link.label}
             </Link>
           ))}
+          {/* Install link in mobile menu */}
+          <Link
+            href="/install"
+            onClick={() => setMenuOpen(false)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-[#1e5631] hover:bg-green-50 transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Install App
+          </Link>
           <div className="pt-2 border-t border-gray-100 mt-2">
             <p className="px-3 py-1 text-xs text-gray-400">{user?.name}</p>
             <button
