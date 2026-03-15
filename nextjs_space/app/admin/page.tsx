@@ -84,9 +84,10 @@ export default function AdminDashboard() {
 
   const filteredTotal = filteredMonthly.reduce((s, m) => s + m.count, 0);
   const filteredRevenue = filteredMonthly.reduce((s, m) => s + m.amount, 0);
-  const nonZeroMonths = filteredMonthly.filter(m => m.count > 0).length || 1;
-  const avgMonthlyRevenue = filteredRevenue / nonZeroMonths;
-  const avgMonthlyTokens  = filteredTotal  / nonZeroMonths;
+  // Count distinct months that have activity in filtered period
+  const activeMonths = filteredMonthly.filter(m => m.count > 0).length || 1;
+  const avgMonthlyRevenue = filteredRevenue / activeMonths;
+  const avgMonthlyTokens  = filteredTotal  / activeMonths;
 
   return (
     <div className="space-y-6">

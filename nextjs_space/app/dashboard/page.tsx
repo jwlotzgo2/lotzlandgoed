@@ -111,10 +111,16 @@ export default function UserDashboard() {
   const totalTokens = approved.reduce((s, p) => s + (p.quantity ?? 0), 0);
   const recentPayments = payments.slice(0, 5);
 
-  // Avg monthly — count non-zero months in filtered period
-  const nonZeroMonths = filteredMonthly.filter(m => m.count > 0).length || 1;
-  const avgMonthlySpend  = totalSpent / nonZeroMonths;
-  const avgMonthlyTokens = totalTokens / nonZeroMonths;
+  // Avg monthly — count distinct months with approved payments in filtered set
+  const approvedMonthKeys = new Set(
+    approved.map(p => {
+      const d = new Date(p.createdAt);
+      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+    })
+  );
+  const activeMonths = approvedMonthKeys.size || 1;
+  const avgMonthlySpend  = totalSpent / activeMonths;
+  const avgMonthlyTokens = totalTokens / activeMonths;
 
   const statusIcon = (s: string) => {
     if (s === "APPROVED") return <CheckCircle className="w-4 h-4 text-green-500" />;
