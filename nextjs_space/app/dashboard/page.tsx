@@ -2,7 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
-import { Zap, CreditCard, Clock, ChevronRight, Gauge, TrendingUp, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { Zap, CreditCard, Clock, ChevronRight, TrendingUp, CheckCircle, XCircle, AlertTriangle, Activity, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Loading } from "@/components/ui/loading";
@@ -19,53 +19,47 @@ interface Payment {
   tokens: { id: string; tokenValue: string; status: string }[];
 }
 
+interface MeterData {
+  meterId: string;
+  meterNumber: string;
+  totalTokens: number;
+  daysSinceLast: number | null;
+  avgDaysBetween: number | null;
+  predictedNextDays: number | null;
+  urgency: "ok" | "soon" | "overdue" | "unknown";
+  lastPurchase: string | null;
+}
+
+const urgencyConfig = {
+  ok:      { color: "text-green-600",  bg: "bg-green-50",  border: "#86efac", icon: CheckCircle,   label: "On track" },
+  soon:    { color: "text-amber-600",  bg: "bg-amber-50",  border: "#fcd34d", icon: AlertTriangle, label: "Buy soon" },
+  overdue: { color: "text-red-600",    bg: "bg-red-50",    border: "#fca5a5", icon: AlertTriangle, label: "Overdue" },
+  unknown: { color: "text-gray-400",   bg: "bg-gray-50",   border: "#e5e7eb", icon: Clock,         label: "No data" },
+};
+
 export default function UserDashboard() {
   const { data: session } = useSession() || {};
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [consumption, setConsumption] = useState<{ byMeter: MeterData[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const user = session?.user as any;
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const res = await fetch("/api/payments");
-        const data = await res.json();
-        if (Array.isArray(data)) setPayments(data);
-      } catch (e) {
-        console.error("Error fetching payments:", e);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+    Promise.all([
+      fetch("/api/payments").then(r => r.json()),
+      fetch("/api/consumption").then(r => r.json()),
+    ]).then(([pData, cData]) => {
+      if (Array.isArray(pData)) setPayments(pData);
+      if (cData?.byMeter) setConsumption(cData);
+    }).catch(console.error).finally(() => setLoading(false));
   }, []);
 
   if (loading) return <Loading text="Loading dashboard..." />;
 
-  // Derived stats
   const approved = payments.filter(p => p.status === "APPROVED");
   const pending = payments.filter(p => p.status === "PENDING");
-  const rejected = payments.filter(p => p.status === "REJECTED");
-  const totalSpent = approved.reduce((sum, p) => sum + (p.totalAmount ?? 0), 0);
-  const totalTokens = approved.reduce((sum, p) => sum + (p.quantity ?? 0), 0);
-  const pendingAmount = pending.reduce((sum, p) => sum + (p.totalAmount ?? 0), 0);
-
-  // Monthly spend (last 6 months)
-  const now = new Date();
-  const monthlyData = Array.from({ length: 6 }, (_, i) => {
-    const d = new Date(now.getFullYear(), now.getMonth() - (5 - i), 1);
-    const label = d.toLocaleString("default", { month: "short" });
-    const total = approved
-      .filter(p => {
-        const pd = new Date(p.createdAt);
-        return pd.getMonth() === d.getMonth() && pd.getFullYear() === d.getFullYear();
-      })
-      .reduce((sum, p) => sum + p.totalAmount, 0);
-    return { label, total };
-  });
-  const maxMonthly = Math.max(...monthlyData.map(m => m.total), 1);
-
-  // Recent payments (last 5)
+  const totalSpent = approved.reduce((s, p) => s + (p.totalAmount ?? 0), 0);
+  const totalTokens = approved.reduce((s, p) => s + (p.quantity ?? 0), 0);
   const recentPayments = payments.slice(0, 5);
 
   const statusIcon = (s: string) => {
@@ -81,140 +75,175 @@ export default function UserDashboard() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Welcome, {user?.name ?? "User"}</h1>
-        <p className="text-gray-500 mt-1">Manage your prepaid electricity tokens</p>
+        <p className="text-gray-500 mt-1 text-sm">Manage your prepaid electricity tokens</p>
       </div>
 
-      {/* BUY TOKENS — Primary CTA */}
+      {/* Buy CTA */}
       <Link href="/dashboard/buy">
-        <motion.div
-          whileHover={{ scale: 1.01 }}
-          whileTap={{ scale: 0.99 }}
-          className="bg-[#1e5631] rounded-2xl p-6 cursor-pointer shadow-lg"
-        >
+        <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}
+          className="bg-[#1e5631] rounded-2xl p-5 cursor-pointer shadow-md">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center">
-                <Zap className="w-8 h-8 text-white" />
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center">
+                <Zap className="w-7 h-7 text-white" />
               </div>
               <div>
-                <p className="text-white/80 text-sm font-medium">Ready to top up?</p>
-                <p className="text-white text-2xl font-bold">Buy Tokens</p>
-                <p className="text-white/70 text-sm mt-0.5">R{TOKEN_PRICE.toLocaleString()} per token</p>
+                <p className="text-white/70 text-sm">Ready to top up?</p>
+                <p className="text-white text-xl font-bold">Buy Tokens</p>
+                <p className="text-white/60 text-xs mt-0.5">R{TOKEN_PRICE.toLocaleString()} per token</p>
               </div>
             </div>
-            <div className="flex items-center gap-2 bg-white/20 text-white px-5 py-2.5 rounded-xl font-semibold">
-              Buy Now
-              <ChevronRight className="w-4 h-4" />
+            <div className="bg-white/20 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-1">
+              Buy Now <ChevronRight className="w-4 h-4" />
             </div>
           </div>
         </motion.div>
       </Link>
 
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {/* Stats */}
+      <div className="grid grid-cols-3 gap-3">
         {[
-          { label: "Total Spent", value: `R${totalSpent.toLocaleString()}`, icon: <TrendingUp className="w-5 h-5 text-[#1e5631]" />, bg: "bg-green-50" },
-          { label: "Tokens Purchased", value: totalTokens, icon: <Zap className="w-5 h-5 text-blue-600" />, bg: "bg-blue-50" },
-          { label: "Pending", value: pending.length > 0 ? `${pending.length} (R${pendingAmount.toLocaleString()})` : "None", icon: <Clock className="w-5 h-5 text-yellow-600" />, bg: "bg-yellow-50" },
-          { label: "Total Payments", value: payments.length, icon: <CreditCard className="w-5 h-5 text-purple-600" />, bg: "bg-purple-50" },
-        ].map((stat, i) => (
-          <motion.div
-            key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="card"
-          >
-            <div className={`w-10 h-10 ${stat.bg} rounded-lg flex items-center justify-center mb-3`}>
-              {stat.icon}
-            </div>
-            <p className="text-xs text-gray-500 mb-1">{stat.label}</p>
-            <p className="text-lg font-bold text-gray-900">{stat.value}</p>
+          { label: "Total Spent",   value: `R${Math.round(totalSpent / 1000)}k`, icon: <TrendingUp className="w-4 h-4 text-[#1e5631]" />, bg: "bg-green-50" },
+          { label: "Tokens",        value: totalTokens,                           icon: <Zap className="w-4 h-4 text-blue-500" />,        bg: "bg-blue-50" },
+          { label: "Pending",       value: pending.length || "—",                 icon: <Clock className="w-4 h-4 text-yellow-500" />,    bg: "bg-yellow-50" },
+        ].map((s, i) => (
+          <motion.div key={s.label} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.06 }} className="card py-3 px-3">
+            <div className={`w-7 h-7 ${s.bg} rounded-lg flex items-center justify-center mb-2`}>{s.icon}</div>
+            <p className="text-lg font-bold text-gray-900 leading-none">{s.value}</p>
+            <p className="text-xs text-gray-500 mt-1">{s.label}</p>
           </motion.div>
         ))}
       </div>
 
-      {/* Monthly Spend Chart */}
-      <div className="card">
-        <h2 className="text-lg font-semibold text-gray-900 mb-6">Monthly Spend</h2>
-        {totalSpent === 0 ? (
-          <p className="text-gray-400 text-sm text-center py-6">No approved payments yet</p>
-        ) : (
-          <div className="flex items-end gap-3 h-36">
-            {monthlyData.map((m, i) => (
-              <div key={m.label} className="flex-1 flex flex-col items-center gap-2">
-                <p className="text-xs text-gray-500 font-medium">
-                  {m.total > 0 ? `R${(m.total / 1000).toFixed(0)}k` : ""}
-                </p>
-                <motion.div
-                  initial={{ height: 0 }}
-                  animate={{ height: m.total > 0 ? `${Math.round((m.total / maxMonthly) * 100)}%` : "4px" }}
-                  transition={{ delay: i * 0.05, duration: 0.4 }}
-                  className={`w-full rounded-t-lg ${m.total > 0 ? "bg-[#1e5631]" : "bg-gray-100"}`}
-                  style={{ minHeight: "4px" }}
-                />
-                <p className="text-xs text-gray-400">{m.label}</p>
-              </div>
-            ))}
+      {/* Meter Status (from consumption API) */}
+      {consumption?.byMeter && consumption.byMeter.length > 0 && (
+        <div>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-base font-semibold text-gray-900">Meter Status</h2>
+            <Link href="/dashboard/consumption" className="text-xs text-[#1e5631] hover:underline flex items-center gap-1">
+              <Activity className="w-3 h-3" /> Consumption →
+            </Link>
           </div>
-        )}
-      </div>
+          <div className="space-y-3">
+            {consumption.byMeter.map((m, i) => {
+              const cfg = urgencyConfig[m.urgency];
+              const Icon = cfg.icon;
+              return (
+                <motion.div key={m.meterId} initial={{ opacity: 0, x: -12 }} animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.07 }}
+                  className={`rounded-xl border p-4 ${cfg.bg}`}
+                  style={{ borderColor: cfg.border }}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <Icon className={`w-5 h-5 ${cfg.color} flex-shrink-0`} />
+                      <div>
+                        <p className="font-semibold text-gray-900 text-sm">Meter {m.meterNumber}</p>
+                        <p className={`text-xs font-medium ${cfg.color}`}>{cfg.label}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      {m.predictedNextDays !== null ? (
+                        <>
+                          <p className={`text-lg font-bold leading-none ${cfg.color}`}>
+                            {m.predictedNextDays === 0 ? "Today" : `${m.predictedNextDays}d`}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {m.predictedNextDays === 0 ? "Top up now" : "next top-up"}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-xs text-gray-400">Insufficient data</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div>
+                      <p className="font-semibold text-gray-800">{m.totalTokens}</p>
+                      <p className="text-gray-400">total</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-800">{m.avgDaysBetween ? `${m.avgDaysBetween}d` : "—"}</p>
+                      <p className="text-gray-400">avg cycle</p>
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-800">{m.daysSinceLast !== null ? `${m.daysSinceLast}d` : "—"}</p>
+                      <p className="text-gray-400">since last</p>
+                    </div>
+                  </div>
+                  {m.avgDaysBetween && m.daysSinceLast !== null && (
+                    <div className="mt-3">
+                      <div className="h-1.5 bg-black/10 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all ${
+                          m.urgency === "overdue" ? "bg-red-400" :
+                          m.urgency === "soon" ? "bg-amber-400" : "bg-green-400"
+                        }`} style={{ width: `${Math.min(100, Math.round((m.daysSinceLast / m.avgDaysBetween) * 100))}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
-      {/* Payment Breakdown + Recent */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Payment breakdown */}
+      {/* Recent Payments + Summary side by side */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Summary */}
         <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Payment Summary</h2>
+          <h2 className="text-sm font-semibold text-gray-900 mb-3">Payment Summary</h2>
           {payments.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-6">No payments yet</p>
+            <p className="text-gray-400 text-sm text-center py-4">No payments yet</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {[
-                { label: "Approved", count: approved.length, amount: totalSpent, color: "bg-green-500" },
-                { label: "Pending", count: pending.length, amount: pendingAmount, color: "bg-yellow-400" },
-                { label: "Rejected", count: rejected.length, amount: rejected.reduce((s, p) => s + p.totalAmount, 0), color: "bg-red-400" },
+                { label: "Approved", count: approved.length, amount: totalSpent,                                              color: "bg-green-500" },
+                { label: "Pending",  count: pending.length,  amount: pending.reduce((s, p) => s + p.totalAmount, 0),          color: "bg-yellow-400" },
+                { label: "Rejected", count: payments.filter(p => p.status === "REJECTED").length,
+                  amount: payments.filter(p => p.status === "REJECTED").reduce((s, p) => s + p.totalAmount, 0), color: "bg-red-400" },
               ].map(row => (
-                <div key={row.label} className="flex items-center gap-3">
-                  <div className={`w-3 h-3 rounded-full ${row.color}`} />
-                  <span className="text-sm text-gray-600 flex-1">{row.label}</span>
-                  <span className="text-sm font-medium text-gray-900">{row.count} payments</span>
-                  <span className="text-sm text-gray-500 w-24 text-right">R{row.amount.toLocaleString()}</span>
+                <div key={row.label} className="flex items-center gap-2 text-sm">
+                  <div className={`w-2 h-2 rounded-full flex-shrink-0 ${row.color}`} />
+                  <span className="text-gray-600 flex-1">{row.label}</span>
+                  <span className="font-medium text-gray-900">{row.count}</span>
+                  <span className="text-gray-400 text-xs w-20 text-right">R{row.amount.toLocaleString()}</span>
                 </div>
               ))}
-              <div className="border-t pt-3 mt-3 flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-700">Total</span>
-                <span className="text-sm font-bold text-gray-900">R{payments.reduce((s, p) => s + p.totalAmount, 0).toLocaleString()}</span>
+              <div className="border-t pt-2 flex justify-between text-sm">
+                <span className="font-medium text-gray-700">Total</span>
+                <span className="font-bold text-gray-900">R{payments.reduce((s, p) => s + p.totalAmount, 0).toLocaleString()}</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Recent payments */}
+        {/* Recent */}
         <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Payments</h2>
-            <Link href="/dashboard/history" className="text-sm text-[#1e5631] hover:underline">View all</Link>
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-sm font-semibold text-gray-900">Recent Payments</h2>
+            <Link href="/dashboard/history" className="text-xs text-[#1e5631] hover:underline">View all</Link>
           </div>
           {recentPayments.length === 0 ? (
-            <p className="text-gray-400 text-sm text-center py-6">No payments yet</p>
+            <p className="text-gray-400 text-sm text-center py-4">No payments yet</p>
           ) : (
-            <div className="space-y-3">
+            <div className="space-y-2">
               {recentPayments.map(p => (
-                <div key={p.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                  <div className="flex items-center gap-3">
+                <div key={p.id} className="flex items-center justify-between py-1.5 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center gap-2">
                     {statusIcon(p.status)}
                     <div>
-                      <p className="text-sm font-medium text-gray-900">Meter {p.meter?.meterNumber}</p>
-                      <p className="text-xs text-gray-400">{new Date(p.createdAt).toLocaleDateString()}</p>
+                      <p className="text-xs font-medium text-gray-900">Meter {p.meter?.meterNumber}</p>
+                      <p className="text-xs text-gray-400">{new Date(p.createdAt).toLocaleDateString("en-ZA")}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-semibold text-gray-900">R{p.totalAmount?.toLocaleString()}</p>
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusColor(p.status)}`}>
+                    <p className="text-xs font-semibold text-gray-900">R{p.totalAmount?.toLocaleString()}</p>
+                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${statusColor(p.status)}`}>
                       {p.aiAutoApproved ? "🤖 " : ""}{p.status}
                     </span>
                   </div>
@@ -224,37 +253,6 @@ export default function UserDashboard() {
           )}
         </div>
       </div>
-
-      {/* Meters */}
-      {user?.meters?.length > 0 && (
-        <div className="card">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Your Meters</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {(user.meters as any[]).map((meter: any) => {
-              const meterPayments = approved.filter(p => p.meter?.meterNumber === meter.meterNumber);
-              const meterTokens = meterPayments.reduce((s, p) => s + p.quantity, 0);
-              const meterSpend = meterPayments.reduce((s, p) => s + p.totalAmount, 0);
-              return (
-                <div key={meter.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#1e5631] rounded-lg flex items-center justify-center">
-                      <Gauge className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-medium text-gray-900">Meter {meter.meterNumber}</p>
-                      <p className="text-xs text-gray-500">{meterTokens} tokens purchased</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-semibold text-[#1e5631]">R{meterSpend.toLocaleString()}</p>
-                    <p className="text-xs text-gray-400">total spent</p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
   );
 }
