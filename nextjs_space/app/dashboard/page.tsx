@@ -102,25 +102,29 @@ export default function UserDashboard() {
     });
   }, [payments, filter]);
 
-  if (loading) return <Loading text="Loading dashboard..." />;
+  // All derived stats in one memo — guaranteed to recompute when filter changes
+  const stats = useMemo(() => {
+    const approved  = filteredPayments.filter(p => p.status === "APPROVED");
+    const pending   = filteredPayments.filter(p => p.status === "PENDING");
+    const rejected  = filteredPayments.filter(p => p.status === "REJECTED");
+    const totalSpent   = approved.reduce((s, p) => s + (p.totalAmount ?? 0), 0);
+    const totalTokens  = approved.reduce((s, p) => s + (p.quantity ?? 0), 0);
+    const monthKeys = new Set(
+      approved.map(p => {
+        const d = new Date(p.createdAt);
+        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+      })
+    );
+    const activeMonths     = monthKeys.size || 1;
+    const avgMonthlySpend  = totalSpent / activeMonths;
+    const avgMonthlyTokens = totalTokens / activeMonths;
+    return { approved, pending, rejected, totalSpent, totalTokens, avgMonthlySpend, avgMonthlyTokens };
+  }, [filteredPayments]);
 
-  const approved  = filteredPayments.filter(p => p.status === "APPROVED");
-  const pending   = filteredPayments.filter(p => p.status === "PENDING");
-  const rejected  = filteredPayments.filter(p => p.status === "REJECTED");
-  const totalSpent  = approved.reduce((s, p) => s + (p.totalAmount ?? 0), 0);
-  const totalTokens = approved.reduce((s, p) => s + (p.quantity ?? 0), 0);
+  const { approved, pending, rejected, totalSpent, totalTokens, avgMonthlySpend, avgMonthlyTokens } = stats;
   const recentPayments = payments.slice(0, 5);
 
-  // Avg monthly — count distinct months with approved payments in filtered set
-  const approvedMonthKeys = new Set(
-    approved.map(p => {
-      const d = new Date(p.createdAt);
-      return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
-    })
-  );
-  const activeMonths = approvedMonthKeys.size || 1;
-  const avgMonthlySpend  = totalSpent / activeMonths;
-  const avgMonthlyTokens = totalTokens / activeMonths;
+  if (loading) return <Loading text="Loading dashboard..." />;
 
   const statusIcon = (s: string) => {
     if (s === "APPROVED") return <CheckCircle className="w-4 h-4 text-green-500" />;
