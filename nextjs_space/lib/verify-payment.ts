@@ -29,7 +29,7 @@ export async function verifyProofOfPayment({
     const today = new Date().toISOString().split("T")[0];
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-    const prompt = `You are verifying a proof of payment for a prepaid electricity token purchase.
+    const prompt = `You are verifying a proof of payment for a prepaid electricity token purchase in South Africa. Documents may be in English or Afrikaans.
 
 Expected payment details:
 - Amount: R${expectedAmount.toLocaleString()}
@@ -38,15 +38,27 @@ Expected payment details:
 ${expectedReference ? `- Reference number provided by user: ${expectedReference}` : "- No reference number provided"}
 ${expectedDate ? `- Payment date provided by user: ${expectedDate}` : ""}
 
-Look at this proof of payment image and extract:
-1. The total amount paid (in Rands, as a number)
-2. Any reference/transaction number visible
-3. The payment date (in YYYY-MM-DD format if possible)
+Extract the following fields. The document may use Afrikaans labels:
+
+AMOUNT — look for:
+  English: "Amount", "Total", "Amount paid"
+  Afrikaans: "Bedrag", "Vir die bedrag van", "Totaal"
+  Format: may appear as "1 600.00" or "R1600" — extract as a number (1600)
+
+DATE — look for:
+  English: "Payment date", "Date", "Transaction date"
+  Afrikaans: "Datum van betaling", "Betalingsdatum", "Datum"
+  Format: convert to YYYY-MM-DD
+
+REFERENCE — look for:
+  English: "Reference", "Transaction number", "Your reference", "Beneficiary reference"
+  Afrikaans: "Verwysing", "Transaksienommer", "Verwysing op begunstigde se staat", "Jou verwysing"
+  Note: The meter number (e.g. 07152292707) is often used as the payment reference
 
 Then determine:
-- Does the amount match? (allow small rounding differences up to R5)
+- Does the amount match R${expectedAmount.toLocaleString()}? (allow up to R5 difference)
 - Is the payment date within the last 7 days (between ${sevenDaysAgo} and ${today})?
-- Does the reference match (if one was provided)?
+- Does ANY reference field on the document match the expected reference (if provided)? Check both transaction number and beneficiary reference fields.
 
 Respond ONLY with a JSON object in this exact format, no other text:
 {
