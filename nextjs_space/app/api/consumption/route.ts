@@ -32,7 +32,9 @@ export async function GET(request: Request) {
 
     // One event per token quantity
     const events = payments.flatMap((p) => {
-      const date = p.verifiedAt ?? p.createdAt;
+      // Use verifiedAt (actual payment date) shifted to SAST
+      const rawDate = p.verifiedAt ?? p.createdAt;
+      const date = rawDate;  // stored as UTC, consumers shift by SAST_OFFSET when comparing
       return Array.from({ length: p.quantity }, () => ({
         date,
         meterNumber: p.meter.meterNumber,
@@ -57,24 +59,27 @@ export async function GET(request: Request) {
     });
     const meters = Array.from(metersMap.values());
 
+    const SAST_OFFSET = 2 * 60 * 60 * 1000; // UTC+2
     const now = new Date();
+    const nowSAST = new Date(now.getTime() + SAST_OFFSET);
 
     // Monthly aggregation — last 36 months for "all time" filter support
+    // All date comparisons in SAST to match what users see in SA
     const monthly = Array.from({ length: 36 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - (35 - i), 1);
-      const monthEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
+      const d = new Date(Date.UTC(nowSAST.getUTCFullYear(), nowSAST.getUTCMonth() - (35 - i), 1));
+      const monthEnd = new Date(Date.UTC(nowSAST.getUTCFullYear(), nowSAST.getUTCMonth() - (35 - i) + 1, 0, 21, 59, 59)); // 23:59 SAST = 21:59 UTC
       const monthEvents = events.filter((e) => {
-        const dt = new Date(e.date!);
+        const dt = new Date(new Date(e.date!).getTime() + SAST_OFFSET);
         return dt >= d && dt <= monthEnd;
       });
       return {
-        month: d.toLocaleString("en-ZA", { month: "short" }),
-        year: d.getFullYear(),
-        label: d.toLocaleString("en-ZA", { month: "short", year: "2-digit" }),
-        monthKey: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
+        month: d.toLocaleString("en-ZA", { month: "short", timeZone: "Africa/Johannesburg" }),
+        year: d.getUTCFullYear(),
+        label: d.toLocaleString("en-ZA", { month: "short", year: "2-digit", timeZone: "Africa/Johannesburg" }),
+        monthKey: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`,
         count: monthEvents.length,
         amount: monthEvents.reduce((s, e) => s + e.amount, 0),
-        season: getSeason(d.getMonth()),
+        season: getSeason(d.getUTCMonth()),
       };
     });
 
@@ -84,9 +89,9 @@ export async function GET(request: Request) {
       const intervals = computeIntervals(meterEvents);
       const lastEvent = meterEvents[meterEvents.length - 1];
       const daysSinceLast = lastEvent
-        ? Math.floor((now.getTime() - new Date(lastEvent.date!).getTime()) / (1000 * 60 * 60 * 24))
+        ? Math.floor((nowSAST.getTime() - (new Date(lastEvent.date!).getTime() + SAST_OFFSET)) / (1000 * 60 * 60 * 24))
         : null;
-      const currentSeason = getSeason(now.getMonth());
+      const currentSeason = getSeason(nowSAST.getUTCMonth());
       const overallAvg = intervals.length > 0
         ? intervals.reduce((a, b) => a + b, 0) / intervals.length
         : null;
@@ -114,7 +119,7 @@ export async function GET(request: Request) {
     const prior3 = monthly.slice(-6, -3).reduce((s, m) => s + m.count, 0);
     const trend = prior3 === 0 ? "neutral" : last3 > prior3 ? "up" : last3 < prior3 ? "down" : "neutral";
     const trendPct = prior3 > 0 ? Math.round(((last3 - prior3) / prior3) * 100) : 0;
-    const currentSeason = getSeason(now.getMonth());
+    const currentSeason = getSeason(nowSAST.getUTCMonth());
 
     return NextResponse.json({
       events: events.slice(-200),

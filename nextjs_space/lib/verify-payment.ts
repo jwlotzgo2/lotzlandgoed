@@ -26,15 +26,19 @@ export async function verifyProofOfPayment({
   fileMimeType?: string;
 }): Promise<VerificationResult> {
   try {
-    const today = new Date().toISOString().split("T")[0];
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+    // South Africa is UTC+2 — shift all date calculations to SAST
+    // so a payment at 11pm SA time isn't treated as the previous day
+    const SAST_OFFSET_MS = 2 * 60 * 60 * 1000;
+    const nowSAST = new Date(Date.now() + SAST_OFFSET_MS);
+    const today = nowSAST.toISOString().split("T")[0];
+    const sevenDaysAgo = new Date(Date.now() + SAST_OFFSET_MS - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
     const prompt = `You are verifying a proof of payment for a prepaid electricity token purchase in South Africa. Documents may be in English or Afrikaans.
 
 Expected payment details:
 - Amount: R${expectedAmount.toLocaleString()}
 - Today's date: ${today}
-- Valid payment window: ${sevenDaysAgo} to ${today} (last 7 days)
+- Valid payment window: ${sevenDaysAgo} to ${today} (last 7 days, dates in South African time SAST/UTC+2)
 ${expectedReference ? `- Reference number provided by user: ${expectedReference}` : "- No reference number provided"}
 ${expectedDate ? `- Payment date provided by user: ${expectedDate}` : ""}
 

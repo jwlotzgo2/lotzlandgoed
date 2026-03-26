@@ -1,4 +1,4 @@
-"use client"; // build: 20260315_193108
+"use client"; // build: 20260326_120956
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useMemo } from "react";
@@ -88,14 +88,16 @@ export default function UserDashboard() {
   }, [consumption, filter]);
 
   const filteredPayments = useMemo(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
+    const SAST = 2 * 60 * 60 * 1000; // UTC+2
+    const nowSAST = new Date(Date.now() + SAST);
+    const currentYear = nowSAST.getUTCFullYear();
     return payments.filter(p => {
-      const d = new Date(p.createdAt);
-      if (filter === "this-year")  return d.getFullYear() === currentYear;
-      if (filter === "last-year")  return d.getFullYear() === currentYear - 1;
+      // Shift stored UTC date to SAST before comparing
+      const d = new Date(new Date(p.createdAt).getTime() + SAST);
+      if (filter === "this-year")  return d.getUTCFullYear() === currentYear;
+      if (filter === "last-year")  return d.getUTCFullYear() === currentYear - 1;
       if (filter === "last-6") {
-        const cutoff = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        const cutoff = new Date(nowSAST.getTime() - 5 * 30 * 24 * 60 * 60 * 1000);
         return d >= cutoff;
       }
       return true;
@@ -109,10 +111,11 @@ export default function UserDashboard() {
     const rejected  = filteredPayments.filter(p => p.status === "REJECTED");
     const totalSpent   = approved.reduce((s, p) => s + (p.totalAmount ?? 0), 0);
     const totalTokens  = approved.reduce((s, p) => s + (p.quantity ?? 0), 0);
+    const SAST = 2 * 60 * 60 * 1000;
     const monthKeys = new Set(
       approved.map(p => {
-        const d = new Date(p.createdAt);
-        return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+        const d = new Date(new Date(p.createdAt).getTime() + SAST);
+        return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,"0")}`;
       })
     );
     const activeMonths     = monthKeys.size || 1;
