@@ -119,6 +119,7 @@ export async function POST(request: Request) {
           expectedAmount,
           expectedReference: referenceNumber,
           expectedDate: paymentDate,
+          userName: user?.name,
           fileBase64: resolvedBase64,
           fileMimeType: resolvedMimeType,
         });

@@ -15,6 +15,7 @@ export async function verifyProofOfPayment({
   expectedAmount,
   expectedReference,
   expectedDate,
+  userName,
   fileBase64,
   fileMimeType,
 }: {
@@ -22,6 +23,7 @@ export async function verifyProofOfPayment({
   expectedAmount: number;
   expectedReference?: string | null;
   expectedDate?: string | null;
+  userName?: string | null;
   fileBase64?: string;
   fileMimeType?: string;
 }): Promise<VerificationResult> {
@@ -40,6 +42,7 @@ Expected payment details:
 - Today's date: ${today}
 - Valid payment window: ${sevenDaysAgo} to ${today} (last 7 days, dates in South African time SAST/UTC+2)
 ${expectedReference ? `- Reference number provided by user: ${expectedReference}` : "- No reference number provided"}
+${userName ? `- Account holder name: ${userName} (the reference on the proof may legitimately be this person's name instead of the meter number)` : ""}
 ${expectedDate ? `- Payment date provided by user: ${expectedDate}` : ""}
 
 Extract the following fields. The document may use Afrikaans labels:
@@ -62,7 +65,7 @@ REFERENCE — look for:
 Then determine:
 - Does the amount match R${expectedAmount.toLocaleString()}? (allow up to R5 difference)
 - Is the payment date within the last 7 days (between ${sevenDaysAgo} and ${today})?
-- Does ANY reference field on the document match the expected reference (if provided)? Check both transaction number and beneficiary reference fields.
+- Does ANY reference field on the document match the expected reference (if provided)? Check both transaction number and beneficiary reference fields. ALSO accept as a valid reference match: a reference field that clearly contains the account holder's name (full name, surname only, or initials + surname — e.g. "T LOTZ", "Theuns Lotz", "LOTZ T" all match a user named "Theuns Lotz"). The bank reference is used to identify the payer, so the account holder's own name is a legitimate identifier.
 
 Respond ONLY with a JSON object in this exact format, no other text:
 {
