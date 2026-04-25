@@ -120,6 +120,7 @@ export async function POST(request: Request) {
           expectedReference: referenceNumber,
           expectedDate: paymentDate,
           userName: user?.name,
+          meterNumber: meterInfo?.meterNumber ?? meter.meterNumber,
           fileBase64: resolvedBase64,
           fileMimeType: resolvedMimeType,
         });

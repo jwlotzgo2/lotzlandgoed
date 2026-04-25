@@ -16,6 +16,7 @@ export async function verifyProofOfPayment({
   expectedReference,
   expectedDate,
   userName,
+  meterNumber,
   fileBase64,
   fileMimeType,
 }: {
@@ -24,6 +25,7 @@ export async function verifyProofOfPayment({
   expectedReference?: string | null;
   expectedDate?: string | null;
   userName?: string | null;
+  meterNumber?: string | null;
   fileBase64?: string;
   fileMimeType?: string;
 }): Promise<VerificationResult> {
@@ -35,14 +37,20 @@ export async function verifyProofOfPayment({
     const today = nowSAST.toISOString().split("T")[0];
     const sevenDaysAgo = new Date(Date.now() + SAST_OFFSET_MS - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
+    // Pre-compute name variants so the prompt can show concrete, user-specific examples
+    const nameParts = userName?.trim().split(/\s+/) ?? [];
+    const firstName = nameParts[0] ?? "";
+    const surname = nameParts.length > 1 ? nameParts[nameParts.length - 1] : "";
+    const initial = firstName[0]?.toUpperCase() ?? "";
+    const initialSurnameExample = surname ? `${initial} ${surname.toUpperCase()}` : "";
+    const surnameInitialExample = surname ? `${surname.toUpperCase()} ${initial}` : "";
+
     const prompt = `You are verifying a proof of payment for a prepaid electricity token purchase in South Africa. Documents may be in English or Afrikaans.
 
 Expected payment details:
 - Amount: R${expectedAmount.toLocaleString()}
 - Today's date: ${today}
 - Valid payment window: ${sevenDaysAgo} to ${today} (last 7 days, dates in South African time SAST/UTC+2)
-${expectedReference ? `- Reference number provided by user: ${expectedReference}` : "- No reference number provided"}
-${userName ? `- Account holder name: ${userName} (the reference on the proof may legitimately be this person's name instead of the meter number)` : ""}
 ${expectedDate ? `- Payment date provided by user: ${expectedDate}` : ""}
 
 Extract the following fields. The document may use Afrikaans labels:
@@ -57,15 +65,24 @@ DATE — look for:
   Afrikaans: "Datum van betaling", "Betalingsdatum", "Datum"
   Format: convert to YYYY-MM-DD
 
-REFERENCE — look for:
-  English: "Reference", "Transaction number", "Your reference", "Beneficiary reference"
+REFERENCE — look for ALL reference-like fields and report whichever is most informative:
+  English: "Reference", "Transaction number", "Your reference", "Beneficiary reference", "Payee", "Recipient"
   Afrikaans: "Verwysing", "Transaksienommer", "Verwysing op begunstigde se staat", "Jou verwysing"
-  Note: The meter number (e.g. 07152292707) is often used as the payment reference
 
 Then determine:
 - Does the amount match R${expectedAmount.toLocaleString()}? (allow up to R5 difference)
 - Is the payment date within the last 7 days (between ${sevenDaysAgo} and ${today})?
-- Does ANY reference field on the document match the expected reference (if provided)? Check both transaction number and beneficiary reference fields. ALSO accept as a valid reference match: a reference field that clearly contains the account holder's name (full name, surname only, or initials + surname — e.g. "T LOTZ", "Theuns Lotz", "LOTZ T" all match a user named "Theuns Lotz"). The bank reference is used to identify the payer, so the account holder's own name is a legitimate identifier.
+- For referenceMatch: scan ALL reference-bearing fields on the document (transaction number, beneficiary reference, payee/recipient name, "your reference"). Set referenceMatch = true if ANY of those fields contains ANY ONE of the following valid identifiers. The user only needs to prove this payment belongs to this meter — any single identifier is enough.
+
+VALID IDENTIFIERS for this payment (any one of these in any reference field = MATCH):
+${meterNumber ? `  • Meter number "${meterNumber}" — this is the canonical payment identifier; if the document reference contains this number anywhere, it is a match regardless of what the user typed.` : ""}
+${userName ? `  • Account holder name "${userName}" — accept ANY of these reasonable variants (case-insensitive):
+      - the full name "${userName}"
+      - the first name "${firstName}" alone${surname ? `\n      - the surname "${surname}" alone` : ""}${surname ? `\n      - first initial + surname, e.g. "${initialSurnameExample}", "${initial}. ${surname}", "${initial}${surname}"` : ""}${surname ? `\n      - surname + first initial, e.g. "${surnameInitialExample}"` : ""}${surname ? `\n      - a family trust or company name that contains the surname (e.g. a reference like "${surname} Family Trust" or "${surname} Holdings" matches)` : ""}` : ""}
+${expectedReference ? `  • User-typed reference "${expectedReference}" — exact or near-exact match.` : ""}
+
+Set referenceMatch = false ONLY if you have scanned every reference field and NONE of them contains any of the identifiers above.
+${!expectedReference && !meterNumber && !userName ? "Set referenceMatch = null (no identifiers available)." : ""}
 
 Respond ONLY with a JSON object in this exact format, no other text:
 {
