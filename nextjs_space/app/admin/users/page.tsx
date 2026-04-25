@@ -169,8 +169,94 @@ export default function UsersPage() {
         />
       </div>
 
-      {/* Users Table */}
-      <div className="table-container overflow-x-auto">
+      {/* Mobile: card list (under md). One card per user, vertical hierarchy, touch-sized actions. */}
+      <div className="md:hidden space-y-3">
+        {filteredUsers.map((user) => (
+          <div
+            key={user.id}
+            className="bg-white rounded-xl shadow-sm border border-gray-100 p-4"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-gray-900 truncate">{user.name}</div>
+                <div className="mt-1 flex items-center gap-2 text-sm text-gray-600">
+                  <Phone className="w-4 h-4 shrink-0" />
+                  <span className="truncate">{user.phone}</span>
+                </div>
+              </div>
+              <div className="flex flex-col items-end gap-1.5 shrink-0">
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    user.role === "ADMIN"
+                      ? "bg-purple-100 text-purple-800"
+                      : "bg-gray-100 text-gray-800"
+                  }`}
+                >
+                  {user.role}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    user.isActive
+                      ? "bg-green-100 text-green-800"
+                      : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  {user.isActive ? "Active" : "Disabled"}
+                </span>
+              </div>
+            </div>
+
+            <div className="mt-3 flex items-start gap-2 text-sm text-gray-700">
+              <Gauge className="w-4 h-4 mt-0.5 shrink-0 text-[#1e5631]" />
+              {user.meters?.length > 0 ? (
+                <span className="break-all">
+                  {user.meters.map((m) => m.meterNumber).join(", ")}
+                </span>
+              ) : (
+                <span className="text-gray-400">No meter assigned</span>
+              )}
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => openEditModal(user)}
+                className="flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 active:bg-gray-100 transition-colors"
+              >
+                <Edit className="w-4 h-4" />
+                <span className="text-sm font-medium">Edit</span>
+              </button>
+              <button
+                onClick={() => toggleUserStatus(user)}
+                className={`flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-lg border transition-colors ${
+                  user.isActive
+                    ? "border-red-200 text-red-600 hover:bg-red-50 active:bg-red-100"
+                    : "border-green-200 text-green-700 hover:bg-green-50 active:bg-green-100"
+                }`}
+              >
+                {user.isActive ? (
+                  <>
+                    <UserX className="w-4 h-4" />
+                    <span className="text-sm font-medium">Disable</span>
+                  </>
+                ) : (
+                  <>
+                    <UserCheck className="w-4 h-4" />
+                    <span className="text-sm font-medium">Enable</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        ))}
+        {filteredUsers.length === 0 && (
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center text-gray-500">
+            No users found
+          </div>
+        )}
+      </div>
+
+      {/* Desktop: table (md and up) */}
+      <div className="hidden md:block table-container overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="table-header">
