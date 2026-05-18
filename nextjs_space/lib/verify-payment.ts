@@ -58,7 +58,7 @@ Extract the following fields. The document may use Afrikaans labels:
 AMOUNT — look for:
   English: "Amount", "Total", "Amount paid"
   Afrikaans: "Bedrag", "Vir die bedrag van", "Totaal"
-  Format: may appear as "1 600.00" or "R1600" — extract as a number (1600)
+  Format: may appear as "1 800.00" or "R1800" — extract as a number (1800)
 
 DATE — look for:
   English: "Payment date", "Date", "Transaction date"

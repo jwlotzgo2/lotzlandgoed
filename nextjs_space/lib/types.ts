@@ -39,4 +39,4 @@ export interface PaymentWithRelations {
   }[];
 }
 
-export const TOKEN_PRICE = 1600; // R1600 per token
+export const TOKEN_PRICE = 1800; // R1800 per token (was R1600 until 2026-04-29)

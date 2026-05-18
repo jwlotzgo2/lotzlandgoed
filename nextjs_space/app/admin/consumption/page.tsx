@@ -70,14 +70,18 @@ export default function AdminConsumptionPage() {
     if (!data?.events || selectedMeter === "all") return filtered;
     const now = new Date(); const cy = now.getFullYear();
     const meterEvents = data.events.filter((e: any) => e.meterId === selectedMeter);
-    // Rebuild monthly counts from events
+    // Rebuild monthly counts AND amounts from events. Use the actual amount
+    // stored on each event (p.totalAmount / p.quantity from the API) so that
+    // historical events at the old R1600 token price stay valued at R1600,
+    // while events after the price change use the new R1800.
     return filtered.map(m => {
-      const count = meterEvents.filter((e: any) => {
+      const monthEvents = meterEvents.filter((e: any) => {
         const d = new Date(e.date);
         const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
         return key === m.monthKey;
-      }).length;
-      return { ...m, count, amount: count * 1600 };
+      });
+      const amount = monthEvents.reduce((s: number, e: any) => s + (e.amount ?? 0), 0);
+      return { ...m, count: monthEvents.length, amount };
     });
   }, [filtered, selectedMeter, data]);
 
